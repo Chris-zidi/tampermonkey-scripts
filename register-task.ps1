@@ -1,6 +1,6 @@
 # register-task.ps1
-$scriptPath = "C:\Users\o-park.chen\Desktop\国家选择器\auto-push.ps1"
 $taskName   = "ChrisAutoPush"
+$scriptPath = "C:\Users\o-park.chen\Desktop\国家选择器\auto-push.ps1"
 
 $action = New-ScheduledTaskAction `
     -Execute "powershell.exe" `
@@ -10,8 +10,6 @@ $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 
 $settings = New-ScheduledTaskSettingsSet `
     -ExecutionTimeLimit 0 `
-    -RestartCount 3 `
-    -RestartInterval (New-TimeSpan -Minutes 2) `
     -StartWhenAvailable
 
 $principal = New-ScheduledTaskPrincipal `
@@ -26,8 +24,11 @@ Register-ScheduledTask `
     -Settings $settings `
     -Principal $principal `
     -Description "Auto push userscript to GitHub on file change" `
-    -Force
+    -Force | Out-Null
 
-Write-Host "Task '$taskName' registered OK" -ForegroundColor Green
+Write-Host "Task registered OK" -ForegroundColor Green
 Start-ScheduledTask -TaskName $taskName
-Write-Host "Task started in background. It will auto-start on every login." -ForegroundColor Cyan
+Start-Sleep -Seconds 3
+$info = Get-ScheduledTaskInfo -TaskName $taskName
+Write-Host "LastRunTime: $($info.LastRunTime)" -ForegroundColor Cyan
+Write-Host "LastTaskResult: $($info.LastTaskResult)" -ForegroundColor Cyan

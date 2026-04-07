@@ -1,82 +1,79 @@
-# ============================================================
 # auto-push.ps1
-# 后台监听 国家选择器.user.js，有改动自动 git commit + push
-# 由 Windows 任务计划程序开机自动后台运行，无需手动启动
-# ============================================================
+# Watches for changes to the userscript and auto git-commits + pushes
+
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
 
 $repoPath  = "C:\Users\o-park.chen\Desktop\国家选择器"
 $watchFile = "国家选择器.user.js"
-$logFile   = "$repoPath\auto-push.log"
-$debounceS = 5  # 防抖：文件保存后等 5 秒再推送
+$logFile   = Join-Path $repoPath "auto-push.log"
+$debounceS = 5
 
 function Write-Log($msg) {
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $line = "[$timestamp] $msg"
-    # 日志文件只保留最近 500 行，防止无限增长
-    if (Test-Path $logFile) {
-        $lines = Get-Content $logFile -Encoding UTF8 -ErrorAction SilentlyContinue
-        if ($lines.Count -gt 500) {
-            $lines = $lines[-400..-1]
-            Set-Content $logFile -Value $lines -Encoding UTF8
-        }
-    }
-    Add-Content -Path $logFile -Value $line -Encoding UTF8
+    try {
+        Add-Content -Path $logFile -Value $line -Encoding UTF8
+    } catch {}
+    Write-Host $line
 }
 
-Write-Log "=== 自动推送守护进程启动 ==="
-Write-Log "监听: $repoPath\$watchFile"
+Write-Log "=== Auto-push daemon started ==="
+Write-Log "Repo: $repoPath"
+Write-Log "Watching: $watchFile"
 
-# 用 FileSystemWatcher 监听文件变化（比轮询更精准）
-$watcher              = New-Object System.IO.FileSystemWatcher
-$watcher.Path         = $repoPath
-$watcher.Filter       = $watchFile
-$watcher.NotifyFilter = [System.IO.NotifyFilters]::LastWrite
-$watcher.EnableRaisingEvents = $true
+if (-not $watchFile) {
+    Write-Log "ERROR: No .user.js file found in $repoPath"
+    exit 1
+}
 
-$lastTriggered = [datetime]::MinValue
+$filePath = Join-Path $repoPath $watchFile
+$lastMod  = (Get-Item $filePath).LastWriteTime
+$lastPush = [datetime]::MinValue
 
-function Do-Push {
-    $now = Get-Date
-    # 防抖：距上次触发不足 debounceS 秒则忽略
-    if (($now - $script:lastTriggered).TotalSeconds -lt $debounceS) { return }
-    $script:lastTriggered = $now
+Write-Log "Initial timestamp: $lastMod"
+Write-Log "Waiting for changes..."
 
-    # 等编辑器完成写入
+while ($true) {
     Start-Sleep -Seconds 2
 
-    Write-Log "检测到文件变化，开始推送..."
+    try {
+        $currentMod = (Get-Item $filePath).LastWriteTime
 
-    Set-Location $repoPath
-    git add $watchFile 2>&1 | Out-Null
+        if ($currentMod -gt $lastMod) {
+            $lastMod = $currentMod
+            $now = Get-Date
 
-    $diff = git diff --cached --name-only 2>&1
-    if ($diff -match "user\.js") {
-        $ts = Get-Date -Format "yyyy-MM-dd HH:mm"
-        git commit -m "auto: $ts" 2>&1 | Out-Null
-        $pushOut = git push origin main 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            Write-Log "推送成功！"
-        } else {
-            Write-Log "推送失败：$pushOut"
+            # debounce
+            if (($now - $lastPush).TotalSeconds -lt $debounceS) {
+                continue
+            }
+
+            Write-Log "Change detected, waiting for editor to finish..."
+            Start-Sleep -Seconds 3
+
+            Write-Log "Starting git push..."
+            Set-Location $repoPath
+
+            $addOut = git add $watchFile 2>&1
+            $diff   = git diff --cached --name-only 2>&1
+
+            if ($diff) {
+                $ts = Get-Date -Format "yyyy-MM-dd HH:mm"
+                $commitOut = git commit -m "auto: $ts" 2>&1
+                $pushOut   = git push origin main 2>&1
+
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Log "Push OK"
+                    $lastPush = Get-Date
+                } else {
+                    Write-Log "Push FAILED: $pushOut"
+                }
+            } else {
+                Write-Log "No staged changes, skipping."
+            }
         }
-    } else {
-        Write-Log "无实际变化，跳过。"
+    } catch {
+        Write-Log "Error: $_"
     }
-}
-
-# 注册文件变化事件
-$job = Register-ObjectEvent -InputObject $watcher -EventName Changed -Action {
-    Do-Push
-}
-
-Write-Log "初始化完成，等待文件变化..."
-
-# 保持进程存活
-try {
-    while ($true) { Start-Sleep -Seconds 10 }
-} finally {
-    Unregister-Event -SourceIdentifier $job.Name -ErrorAction SilentlyContinue
-    $watcher.EnableRaisingEvents = $false
-    $watcher.Dispose()
-    Write-Log "守护进程已停止。"
 }
