@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.2.0
+// @version       2.2.1
 // @description   电源规格国家选择器（支持 mkt + stormsend 双站）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -11,77 +11,87 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.2.0 启动');
+    console.log('Chris：国家Selector v2.2.1 启动');
 
     /**************** 按钮配置 ****************
-     * values   : 国家代码（小写），两种页面通用
+     * values   : 国家代码（小写）
      * lang     : 语言代码，支持字符串或数组（表单型页面用）
-     * formOnly : true = 只在 FORM 页面显示（Stormsend）
-     *            不设置或 false = 只在 MODAL 页面显示（mkt）
+     * formOnly : true  = 只在 FORM 页面显示（Stormsend）
+     *            false = 只在 MODAL 页面显示（mkt）
+     *            不设置 = 两个页面都显示
      ******************************************/
     const BUTTON_CONFIGS = [
-        // ── MODAL 专用（mkt 页面，原有 12 个按钮）──────────────────
-        { name: 'EN美规',  flag: '⭐', values: ['ph','ca'],
+        // ── EN 英语 - 蓝色系 ───────────────────────────────────────
+        // EN美规：仅 mkt
+        { name: 'EN美规',  flag: '⭐', formOnly: false, values: ['ph','ca'],
           lang: 'en',
           gradient: 'linear-gradient(160deg, #4fc3f7 0%, #1976d2 50%, #0d47a1 100%)',
           shadow: '0 4px 15px rgba(25,118,210,0.55)', group: 'EN' },
+        // EN英规：两个页面都显示
         { name: 'EN英规',  flag: '⭐', values: ['gb'],
           lang: 'en',
           gradient: 'linear-gradient(160deg, #81d4fa 0%, #0288d1 50%, #01579b 100%)',
           shadow: '0 4px 15px rgba(2,136,209,0.55)', group: 'EN' },
+        // EN澳规：两个页面都显示
         { name: 'EN澳规',  flag: '⭐', values: ['au'],
           lang: 'en',
           gradient: 'linear-gradient(160deg, #b3e5fc 0%, #039be5 50%, #0277bd 100%)',
           shadow: '0 4px 15px rgba(3,155,229,0.55)', group: 'EN' },
-        { name: 'EN欧规',  flag: '⭐', values: ['be','bg','hr','cz','dk','ee','fi','gr','hu','ie','lv','lt','mt','nl','no','pl','pt','ro','sk','si','se','ch'],
+        // EN欧规：仅 mkt
+        { name: 'EN欧规',  flag: '⭐', formOnly: false, values: ['be','bg','hr','cz','dk','ee','fi','gr','hu','ie','lv','lt','mt','nl','no','pl','pt','ro','sk','si','se','ch'],
           lang: 'en',
           gradient: 'linear-gradient(160deg, #64b5f6 0%, #1565c0 50%, #0a2e6e 100%)',
           shadow: '0 4px 15px rgba(21,101,192,0.55)', group: 'EN' },
+        // ── 中规 - 红色系 ──────────────────────────────────────────
         { name: '中规',    flag: '⭐', values: ['cn'],
           lang: 'zh-CN',
           gradient: 'linear-gradient(160deg, #ef9a9a 0%, #e53935 50%, #8b0000 100%)',
           shadow: '0 4px 15px rgba(229,57,53,0.55)', group: 'CN' },
+        // ── 日规 - 朱红橙系 ────────────────────────────────────────
         { name: '日规',    flag: '⭐', values: ['jp'],
           lang: 'ja',
           gradient: 'linear-gradient(160deg, #ffab91 0%, #f4511e 50%, #bf360c 100%)',
           shadow: '0 4px 15px rgba(244,81,30,0.55)', group: 'JP' },
-        { name: 'FR美规',  flag: '⭐', values: ['ca'],
+        // ── FR 法语 - 橙金系（仅 mkt）─────────────────────────────
+        { name: 'FR美规',  flag: '⭐', formOnly: false, values: ['ca'],
           lang: 'fr',
           gradient: 'linear-gradient(160deg, #ffe082 0%, #ffa000 50%, #e65100 100%)',
           shadow: '0 4px 15px rgba(255,160,0,0.55)', group: 'FR' },
-        { name: 'FR欧规',  flag: '⭐', values: ['mc','fr','lu'],
+        { name: 'FR欧规',  flag: '⭐', formOnly: false, values: ['mc','fr','lu'],
           lang: 'fr',
           gradient: 'linear-gradient(160deg, #ffcc80 0%, #fb8c00 50%, #bf360c 100%)',
           shadow: '0 4px 15px rgba(251,140,0,0.55)', group: 'FR' },
+        // ── TCN 繁中 - 青绿系 ──────────────────────────────────────
         { name: 'TCN英规', flag: '⭐', values: ['hk','mo'],
           lang: 'zh-TW',
           gradient: 'linear-gradient(160deg, #80deea 0%, #00acc1 50%, #006064 100%)',
           shadow: '0 4px 15px rgba(0,172,193,0.55)', group: 'TCN' },
-        { name: 'DE欧规',  flag: '⭐', values: ['at','de','li'],
+        // ── DE 德语 - 深蓝紫系（仅 mkt）──────────────────────────
+        { name: 'DE欧规',  flag: '⭐', formOnly: false, values: ['at','de','li'],
           lang: 'de',
           gradient: 'linear-gradient(160deg, #9fa8da 0%, #3949ab 50%, #1a237e 100%)',
           shadow: '0 4px 15px rgba(57,73,171,0.55)', group: 'DE' },
-        { name: 'ES欧规',  flag: '⭐', values: ['es'],
+        // ── ES 西语 - 玫红紫系（仅 mkt）──────────────────────────
+        { name: 'ES欧规',  flag: '⭐', formOnly: false, values: ['es'],
           lang: 'es',
           gradient: 'linear-gradient(160deg, #f48fb1 0%, #d81b60 50%, #880e4f 100%)',
           shadow: '0 4px 15px rgba(216,27,96,0.55)', group: 'ES' },
-        { name: 'IT欧规',  flag: '⭐', values: ['it'],
+        // ── IT 意语 - 翠绿系（仅 mkt）────────────────────────────
+        { name: 'IT欧规',  flag: '⭐', formOnly: false, values: ['it'],
           lang: 'it',
           gradient: 'linear-gradient(160deg, #a5d6a7 0%, #43a047 50%, #1b5e20 100%)',
           shadow: '0 4px 15px rgba(67,160,71,0.55)', group: 'IT' },
 
-        // ── FORM 专用（Stormsend 页面，收拢为2个大按钮）────────────
+        // ── FORM 专用（Stormsend）──────────────────────────────────
+        // 通用美规 = EN美规(ph,ca) + FR美规(ca) → ph,ca + 语言 en,fr
         { name: '通用美规', flag: '⭐', formOnly: true,
-          // EN美规(ph,ca) + FR美规(ca) 去重
           values: ['ph','ca'],
-          // 同时勾选英语 + 法语
           lang: ['en','fr'],
           gradient: 'linear-gradient(160deg, #4fc3f7 0%, #1976d2 50%, #0d47a1 100%)',
           shadow: '0 4px 15px rgba(25,118,210,0.55)', group: 'FORM' },
+        // 通用欧规 = EN欧规+FR欧规+DE欧规+ES欧规+IT欧规 → 全部国家 + 语言 en,fr,de,es,it
         { name: '通用欧规', flag: '⭐', formOnly: true,
-          // EN欧规 + FR欧规 + DE欧规 + ES欧规 + IT欧规 国家合集（去重）
           values: ['be','bg','hr','cz','dk','ee','fi','gr','hu','ie','lv','lt','mt','nl','no','pl','pt','ro','sk','si','se','ch','mc','fr','lu','at','de','li','es','it'],
-          // 同时勾选 英/法/德/西/意 5种语言
           lang: ['en','fr','de','es','it'],
           gradient: 'linear-gradient(160deg, #ce93d8 0%, #7b1fa2 50%, #4a0072 100%)',
           shadow: '0 4px 15px rgba(123,31,162,0.55)', group: 'FORM' },
@@ -237,10 +247,15 @@
             pointer-events: none;
         `;
 
-        // 按页面类型过滤：FORM 只显示 formOnly 按钮，MODAL 只显示非 formOnly 按钮
-        const visibleConfigs = BUTTON_CONFIGS.filter(cfg =>
-            pageType === 'FORM' ? cfg.formOnly === true : !cfg.formOnly
-        );
+        // 过滤逻辑：
+        // formOnly: true  → 只在 FORM 显示
+        // formOnly: false → 只在 MODAL 显示
+        // formOnly 未设置 → 两个页面都显示
+        const visibleConfigs = BUTTON_CONFIGS.filter(cfg => {
+            if (cfg.formOnly === true)  return pageType === 'FORM';
+            if (cfg.formOnly === false) return pageType === 'MODAL';
+            return true; // 未设置：两边都显示
+        });
 
         visibleConfigs.forEach(cfg => {
             const btn = document.createElement('button');
