@@ -1,17 +1,17 @@
 // ==UserScript==
 // @name          国家选择器
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       1.2.0
+// @version       1.2.1
 // @description   电源规格国家选择器
 // @author        Chris-zidi
 // @match         *://*/*
 // @grant         none
-// @updateURL     https://raw.githubusercontent.com/Chris-zidi/tampermonkey-scripts/main/%E5%9B%BD%E5%AE%B6%E9%80%89%E6%8B%A9%E5%99%A8/%E5%9B%BD%E5%AE%B6%E9%80%89%E6%8B%A9%E5%99%A8.user.js
-// @downloadURL   https://raw.githubusercontent.com/Chris-zidi/tampermonkey-scripts/main/%E5%9B%BD%E5%AE%B6%E9%80%89%E6%8B%A9%E5%99%A8/%E5%9B%BD%E5%AE%B6%E9%80%89%E6%8B%A9%E5%99%A8.user.js
+// @updateURL     https://cdn.jsdelivr.net/gh/Chris-zidi/tampermonkey-scripts@main/%E5%9B%BD%E5%AE%B6%E9%80%89%E6%8B%A9%E5%99%A8/%E5%9B%BD%E5%AE%B6%E9%80%89%E6%8B%A9%E5%99%A8.user.js
+// @downloadURL   https://cdn.jsdelivr.net/gh/Chris-zidi/tampermonkey-scripts@main/%E5%9B%BD%E5%AE%B6%E9%80%89%E6%8B%A9%E5%99%A8/%E5%9B%BD%E5%AE%B6%E9%80%89%E6%8B%A9%E5%99%A8.user.js
 // ==/UserScript==
 
 (function () {
-    console.log("Chris：国家选择器 v1.2.0 启动");
+    console.log("Chris：国家选择器 v1.2.1 启动");
 
     /**************** 按钮配置 ****************/
     // gradient: CSS 渐变色背景
