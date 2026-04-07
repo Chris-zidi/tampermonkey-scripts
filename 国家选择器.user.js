@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家选择器
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       1.2.2
+// @version       1.3.0
 // @description   电源规格国家选择器
 // @author        Chris-zidi
 // @match         *://*/*
@@ -11,41 +11,40 @@
 // ==/UserScript==
 
 (function () {
-    console.log("Chris：国家选择器 v1.2.2 启动");
+    console.log("Chris：国家选择器 v1.3.0 启动");
 
-    /**************** 按钮配置 ****************/
-    // gradient: CSS 渐变色背景
+    /**************** 按钮配置（按语种分组） ****************/
+    // group: 语种分组名，同组之间紧密排列，组间有分隔间距
+    // gradient: 同组用同色系渐变
     const BUTTON_CONFIGS = [
-        { name: 'EN美规',  values: ['PH', 'CA'],
-          gradient: 'linear-gradient(135deg, #f7971e, #ffd200)' },
-        { name: 'EN英规',  values: ['GB'],
-          gradient: 'linear-gradient(135deg, #1a6fc4, #2196f3)' },
-        { name: '日规',    values: ['JP'],
-          gradient: 'linear-gradient(135deg, #c0392b, #e74c3c)' },
-        { name: 'EN澳规',  values: ['AU'],
-          gradient: 'linear-gradient(135deg, #11998e, #38ef7d)' },
+        // EN 英语 - 蓝色系
+        { name: 'EN美规',  values: ['PH', 'CA'],        gradient: 'linear-gradient(135deg, #1565c0, #42a5f5)', group: 'EN' },
+        { name: 'EN英规',  values: ['GB'],               gradient: 'linear-gradient(135deg, #1976d2, #64b5f6)', group: 'EN' },
+        { name: 'EN澳规',  values: ['AU'],               gradient: 'linear-gradient(135deg, #0288d1, #4fc3f7)', group: 'EN' },
         { name: 'EN欧规',  values: ['BE','BG','HR','CZ','DK','EE','FI','GR','HU','IE','LV','LT','MT','NL','NO','PL','PT','RO','SK','SI','SE','CH'],
-          gradient: 'linear-gradient(135deg, #6a11cb, #a855f7)' },
-        { name: '中规',    values: ['CN'],
-          gradient: 'linear-gradient(135deg, #e52d27, #b31217)' },
-        { name: 'FR美规',  values: ['CA'],
-          gradient: 'linear-gradient(135deg, #f46b45, #eea849)' },
-        { name: 'FR欧规',  values: ['MC', 'FR', 'LU'],
-          gradient: 'linear-gradient(135deg, #1f3c6e, #2c5282)' },
-        { name: 'TCN英规', values: ['HK', 'MO'],
-          gradient: 'linear-gradient(135deg, #00b09b, #00d2ff)' },
-        { name: 'DE欧规',  values: ['AT', 'DE', 'LI'],
-          gradient: 'linear-gradient(135deg, #4b6cb7, #182848)' },
-        { name: 'ES欧规',  values: ['ES'],
-          gradient: 'linear-gradient(135deg, #c94b4b, #4b134f)' },
-        { name: 'IT欧规',  values: ['IT'],
-          gradient: 'linear-gradient(135deg, #f7971e, #21d4fd)' },
+                                                          gradient: 'linear-gradient(135deg, #01579b, #29b6f6)', group: 'EN' },
+        // 中规 - 红色系
+        { name: '中规',    values: ['CN'],               gradient: 'linear-gradient(135deg, #c62828, #ef5350)', group: 'CN' },
+        // 日规 - 朱红系
+        { name: '日规',    values: ['JP'],               gradient: 'linear-gradient(135deg, #b71c1c, #ff7043)', group: 'JP' },
+        // FR 法语 - 橙色系
+        { name: 'FR美规',  values: ['CA'],               gradient: 'linear-gradient(135deg, #e65100, #ffa726)', group: 'FR' },
+        { name: 'FR欧规',  values: ['MC', 'FR', 'LU'],  gradient: 'linear-gradient(135deg, #bf360c, #ff8a65)', group: 'FR' },
+        // TCN 繁中 - 青绿系
+        { name: 'TCN英规', values: ['HK', 'MO'],         gradient: 'linear-gradient(135deg, #00695c, #26c6da)', group: 'TCN' },
+        // DE 德语 - 深蓝灰系
+        { name: 'DE欧规',  values: ['AT', 'DE', 'LI'],  gradient: 'linear-gradient(135deg, #1a237e, #5c6bc0)', group: 'DE' },
+        // ES 西语 - 玫红系
+        { name: 'ES欧规',  values: ['ES'],               gradient: 'linear-gradient(135deg, #880e4f, #e91e8c)', group: 'ES' },
+        // IT 意语 - 黄绿系
+        { name: 'IT欧规',  values: ['IT'],               gradient: 'linear-gradient(135deg, #558b2f, #cddc39)', group: 'IT' },
     ];
-    /******************************************/
+    /********************************************************/
 
-    const BTN_WIDTH  = 108;  // 所有按钮统一宽度 px（加宽确保TCN英规完整显示）
-    const BTN_HEIGHT = 44;   // 按钮高度 px
-    const BTN_GAP    = 6;    // 按钮间距 px
+    const BTN_WIDTH  = 108;  // 所有按钮统一宽度 px
+    const BTN_HEIGHT = 40;   // 按钮高度 px
+    const BTN_GAP    = 3;    // 同组按钮间距 px（紧密）
+    const GROUP_GAP  = 10;   // 不同组之间的间距 px
     const BTN_RIGHT  = 14;   // 距页面右边距 px
     const BTN_TOP    = 80;   // 第一个按钮距页面顶部 px
 
@@ -98,26 +97,38 @@
             z-index: 2147483647;
             display: none;
             flex-direction: column;
-            gap: ${BTN_GAP}px;
+            gap: 0;
             pointer-events: none;
         `;
 
+        // 按 group 分组，相邻不同组之间插入间距
+        let lastGroup = null;
         BUTTON_CONFIGS.forEach(cfg => {
+            // 组间分隔：插入一个透明间距块
+            if (lastGroup !== null && lastGroup !== cfg.group) {
+                const spacer = document.createElement('div');
+                spacer.style.cssText = `height: ${GROUP_GAP}px; pointer-events: none;`;
+                panel.appendChild(spacer);
+            }
+            lastGroup = cfg.group;
+
+            // 按钮本身
             const btn = document.createElement('button');
             btn.textContent = '⭐ ' + cfg.name;
             btn.style.cssText = `
                 width: ${BTN_WIDTH}px;
                 height: ${BTN_HEIGHT}px;
-                border-radius: 10px;
+                margin-bottom: ${BTN_GAP}px;
+                border-radius: 8px;
                 border: none;
                 background: ${cfg.gradient};
                 color: #fff;
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 700;
                 font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
                 letter-spacing: 0.5px;
                 cursor: pointer;
-                box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+                box-shadow: 0 3px 10px rgba(0,0,0,0.22);
                 transition: transform 0.12s ease, box-shadow 0.12s ease;
                 pointer-events: auto;
                 text-shadow: 0 1px 3px rgba(0,0,0,0.3);
@@ -126,12 +137,12 @@
                 padding: 0 10px;
             `;
             btn.onmouseover = () => {
-                btn.style.transform = 'scale(1.08) translateX(-2px)';
-                btn.style.boxShadow = '0 6px 20px rgba(0,0,0,0.35)';
+                btn.style.transform = 'scale(1.07) translateX(-2px)';
+                btn.style.boxShadow = '0 6px 18px rgba(0,0,0,0.32)';
             };
             btn.onmouseout = () => {
                 btn.style.transform = 'scale(1) translateX(0)';
-                btn.style.boxShadow = '0 4px 14px rgba(0,0,0,0.25)';
+                btn.style.boxShadow = '0 3px 10px rgba(0,0,0,0.22)';
             };
             btn.onclick = e => {
                 e.stopPropagation();
