@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家选择器
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       1.1.0
+// @version       1.2.0
 // @description   电源规格国家选择器
 // @author        Chris-zidi
 // @match         *://*/*
@@ -11,7 +11,7 @@
 // ==/UserScript==
 
 (function () {
-    console.log("Chris：国家选择器 v1.1.0 启动");
+    console.log("Chris：国家选择器 v1.2.0 启动");
 
     /**************** 按钮配置 ****************/
     // gradient: CSS 渐变色背景
@@ -43,7 +43,7 @@
     ];
     /******************************************/
 
-    const BTN_WIDTH  = 96;   // 所有按钮统一宽度 px
+    const BTN_WIDTH  = 108;  // 所有按钮统一宽度 px（加宽确保TCN英规完整显示）
     const BTN_HEIGHT = 44;   // 按钮高度 px
     const BTN_GAP    = 6;    // 按钮间距 px
     const BTN_RIGHT  = 14;   // 距页面右边距 px
@@ -83,21 +83,20 @@
     }
 
     /************** 注入固定悬浮按钮面板 **************/
-    let panelInjected = false;
+    let panel = null;
 
     function injectPanel() {
-        if (panelInjected) return;
-        panelInjected = true;
+        if (panel) return;
 
-        // 外层容器，fixed 固定在页面右侧
-        const panel = document.createElement('div');
+        // 外层容器，fixed 固定在页面右侧，默认隐藏
+        panel = document.createElement('div');
         panel.id = 'chris-country-panel';
         panel.style.cssText = `
             position: fixed;
             right: ${BTN_RIGHT}px;
             top: ${BTN_TOP}px;
             z-index: 2147483647;
-            display: flex;
+            display: none;
             flex-direction: column;
             gap: ${BTN_GAP}px;
             pointer-events: none;
@@ -123,9 +122,8 @@
                 pointer-events: auto;
                 text-shadow: 0 1px 3px rgba(0,0,0,0.3);
                 white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                padding: 0 8px;
+                overflow: visible;
+                padding: 0 10px;
             `;
             btn.onmouseover = () => {
                 btn.style.transform = 'scale(1.08) translateX(-2px)';
@@ -138,7 +136,6 @@
             btn.onclick = e => {
                 e.stopPropagation();
                 e.preventDefault();
-                // 找当前打开的 modal
                 const modal = document.querySelector('.modal.show,[role="dialog"]');
                 if (!modal) {
                     console.warn('Chris：没有找到打开的 modal');
@@ -146,7 +143,6 @@
                 }
                 applySelection(modal, cfg.values);
                 console.log(`Chris：已应用 ${cfg.name}（${cfg.values.join(',')}）`);
-                // 按钮短暂缩小给视觉反馈
                 btn.style.transform = 'scale(0.93)';
                 setTimeout(() => { btn.style.transform = 'scale(1)'; }, 140);
             };
@@ -156,11 +152,42 @@
         document.body.appendChild(panel);
     }
 
-    /************** 等 body 就绪后注入面板 **************/
-    if (document.body) {
+    /************** 显示/隐藏面板 **************/
+    function showPanel() {
+        if (!panel) injectPanel();
+        panel.style.display = 'flex';
+    }
+
+    function hidePanel() {
+        if (panel) panel.style.display = 'none';
+    }
+
+    /************** 监听 modal 出现和消失 **************/
+    function hasModal() {
+        return !!document.querySelector('.modal.show,[role="dialog"]');
+    }
+
+    const observer = new MutationObserver(() => {
+        if (hasModal()) {
+            showPanel();
+        } else {
+            hidePanel();
+        }
+    });
+
+    // 等 body 就绪后启动监听
+    function init() {
         injectPanel();
+        // 如果页面加载时 modal 已经存在，立即显示
+        if (hasModal()) showPanel();
+
+        observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    }
+
+    if (document.body) {
+        init();
     } else {
-        document.addEventListener('DOMContentLoaded', injectPanel);
+        document.addEventListener('DOMContentLoaded', init);
     }
 
 })();
