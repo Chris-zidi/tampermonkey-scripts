@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.2.1
+// @version       2.3.0
 // @description   电源规格国家选择器（支持 mkt + stormsend 双站）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -11,7 +11,7 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.2.1 启动');
+    console.log('Chris：国家Selector v2.3.0 启动');
 
     /**************** 按钮配置 ****************
      * values   : 国家代码（小写）
@@ -197,6 +197,7 @@
         const style = document.createElement('style');
         style.id = 'chris-country-style';
         style.textContent = `
+            #chris-country-panel { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
             .chris-btn {
                 position: relative;
                 overflow: hidden;
@@ -221,17 +222,50 @@
                 box-shadow: inset 0 -2px 6px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.3);
                 pointer-events: none;
             }
+            /* 收起/展开箭头按钮 */
+            #chris-toggle-btn {
+                width: 28px;
+                height: 28px;
+                border-radius: 50%;
+                border: none;
+                background: rgba(255,255,255,0.92);
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 13px;
+                transition: transform 0.2s ease, background 0.2s ease;
+                pointer-events: auto;
+                align-self: flex-end;
+                margin-bottom: 4px;
+            }
+            #chris-toggle-btn:hover { background: #fff; transform: scale(1.1); }
+            #chris-btn-list {
+                display: flex;
+                flex-direction: column;
+                gap: ${BTN_GAP}px;
+                overflow: hidden;
+                transition: opacity 0.2s ease;
+            }
+            #chris-btn-list.collapsed {
+                display: none;
+            }
         `;
         document.head.appendChild(style);
     }
 
     /***********************************************
-     * 注入按钮面板
+     * 注入按钮面板（防止重复注入）
      ***********************************************/
     let panel = null;
 
     function injectPanel(pageType) {
-        if (panel) return;
+        // 防止页面嵌套导致重复注入
+        if (document.getElementById('chris-country-panel')) {
+            panel = document.getElementById('chris-country-panel');
+            return;
+        }
         injectStyles();
 
         panel = document.createElement('div');
@@ -243,18 +277,43 @@
             z-index: 2147483647;
             display: none;
             flex-direction: column;
-            gap: ${BTN_GAP}px;
+            align-items: flex-end;
+            gap: 0;
             pointer-events: none;
         `;
 
-        // 过滤逻辑：
-        // formOnly: true  → 只在 FORM 显示
-        // formOnly: false → 只在 MODAL 显示
-        // formOnly 未设置 → 两个页面都显示
+        // 收起/展开箭头按钮（默认收起：箭头朝左 ‹，展开后朝右 ›）
+        const toggleBtn = document.createElement('button');
+        toggleBtn.id = 'chris-toggle-btn';
+        toggleBtn.textContent = '›';
+        toggleBtn.title = '展开/收起';
+
+        // 按钮列表容器，默认收起
+        const btnList = document.createElement('div');
+        btnList.id = 'chris-btn-list';
+        btnList.classList.add('collapsed');
+
+        let expanded = false;
+        toggleBtn.onclick = e => {
+            e.stopPropagation();
+            e.preventDefault();
+            expanded = !expanded;
+            if (expanded) {
+                btnList.classList.remove('collapsed');
+                toggleBtn.textContent = '›'; // 展开时箭头朝右（点击收起）
+                toggleBtn.style.transform = 'rotate(180deg)';
+            } else {
+                btnList.classList.add('collapsed');
+                toggleBtn.textContent = '›';
+                toggleBtn.style.transform = 'rotate(0deg)';
+            }
+        };
+
+        // 过滤逻辑
         const visibleConfigs = BUTTON_CONFIGS.filter(cfg => {
             if (cfg.formOnly === true)  return pageType === 'FORM';
             if (cfg.formOnly === false) return pageType === 'MODAL';
-            return true; // 未设置：两边都显示
+            return true;
         });
 
         visibleConfigs.forEach(cfg => {
@@ -270,7 +329,6 @@
                 color: #fff;
                 font-size: 13px;
                 font-weight: 800;
-                font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
                 letter-spacing: 0.5px;
                 cursor: pointer;
                 box-shadow: ${cfg.shadow}, inset 0 1px 0 rgba(255,255,255,0.25);
@@ -281,6 +339,7 @@
                 padding: 0 12px;
                 text-align: center;
                 filter: brightness(1);
+                margin-bottom: ${BTN_GAP}px;
             `;
             btn.onmouseover = () => {
                 btn.style.transform = 'scale(1.08) translateX(-3px)';
@@ -295,11 +354,8 @@
             btn.onclick = e => {
                 e.stopPropagation();
                 e.preventDefault();
-                if (pageType === 'FORM') {
-                    applyForm(cfg);
-                } else {
-                    applyModal(cfg);
-                }
+                if (pageType === 'FORM') applyForm(cfg);
+                else applyModal(cfg);
                 btn.style.transform = 'scale(0.92)';
                 btn.style.filter = 'brightness(0.9)';
                 setTimeout(() => {
@@ -307,9 +363,11 @@
                     btn.style.filter = 'brightness(1)';
                 }, 150);
             };
-            panel.appendChild(btn);
+            btnList.appendChild(btn);
         });
 
+        panel.appendChild(toggleBtn);
+        panel.appendChild(btnList);
         document.body.appendChild(panel);
     }
 
