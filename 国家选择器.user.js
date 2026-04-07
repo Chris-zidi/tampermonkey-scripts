@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家选择器
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       1.3.0
+// @version       1.4.0
 // @description   电源规格国家选择器
 // @author        Chris-zidi
 // @match         *://*/*
@@ -11,40 +11,37 @@
 // ==/UserScript==
 
 (function () {
-    console.log("Chris：国家选择器 v1.3.0 启动");
+    console.log("Chris：国家选择器 v1.4.0 启动");
 
-    /**************** 按钮配置（按语种分组） ****************/
-    // group: 语种分组名，同组之间紧密排列，组间有分隔间距
-    // gradient: 同组用同色系渐变
+    /**************** 按钮配置（按语种分组，同色系） ****************/
     const BUTTON_CONFIGS = [
         // EN 英语 - 蓝色系
-        { name: 'EN美规',  values: ['PH', 'CA'],        gradient: 'linear-gradient(135deg, #1565c0, #42a5f5)', group: 'EN' },
-        { name: 'EN英规',  values: ['GB'],               gradient: 'linear-gradient(135deg, #1976d2, #64b5f6)', group: 'EN' },
-        { name: 'EN澳规',  values: ['AU'],               gradient: 'linear-gradient(135deg, #0288d1, #4fc3f7)', group: 'EN' },
-        { name: 'EN欧规',  values: ['BE','BG','HR','CZ','DK','EE','FI','GR','HU','IE','LV','LT','MT','NL','NO','PL','PT','RO','SK','SI','SE','CH'],
-                                                          gradient: 'linear-gradient(135deg, #01579b, #29b6f6)', group: 'EN' },
+        { name: 'EN美规',  flag: '🇺🇸', values: ['PH', 'CA'],        gradient: 'linear-gradient(135deg, #1565c0, #42a5f5)', group: 'EN' },
+        { name: 'EN英规',  flag: '🇬🇧', values: ['GB'],               gradient: 'linear-gradient(135deg, #1976d2, #64b5f6)', group: 'EN' },
+        { name: 'EN澳规',  flag: '🇦🇺', values: ['AU'],               gradient: 'linear-gradient(135deg, #0288d1, #4fc3f7)', group: 'EN' },
+        { name: 'EN欧规',  flag: '🇪🇺', values: ['BE','BG','HR','CZ','DK','EE','FI','GR','HU','IE','LV','LT','MT','NL','NO','PL','PT','RO','SK','SI','SE','CH'],
+                                                                        gradient: 'linear-gradient(135deg, #01579b, #29b6f6)', group: 'EN' },
         // 中规 - 红色系
-        { name: '中规',    values: ['CN'],               gradient: 'linear-gradient(135deg, #c62828, #ef5350)', group: 'CN' },
+        { name: '中规',    flag: '🇨🇳', values: ['CN'],               gradient: 'linear-gradient(135deg, #c62828, #ef5350)', group: 'CN' },
         // 日规 - 朱红系
-        { name: '日规',    values: ['JP'],               gradient: 'linear-gradient(135deg, #b71c1c, #ff7043)', group: 'JP' },
+        { name: '日规',    flag: '🇯🇵', values: ['JP'],               gradient: 'linear-gradient(135deg, #b71c1c, #ff7043)', group: 'JP' },
         // FR 法语 - 橙色系
-        { name: 'FR美规',  values: ['CA'],               gradient: 'linear-gradient(135deg, #e65100, #ffa726)', group: 'FR' },
-        { name: 'FR欧规',  values: ['MC', 'FR', 'LU'],  gradient: 'linear-gradient(135deg, #bf360c, #ff8a65)', group: 'FR' },
+        { name: 'FR美规',  flag: '🇫🇷', values: ['CA'],               gradient: 'linear-gradient(135deg, #e65100, #ffa726)', group: 'FR' },
+        { name: 'FR欧规',  flag: '🇫🇷', values: ['MC', 'FR', 'LU'],  gradient: 'linear-gradient(135deg, #bf360c, #ff8a65)', group: 'FR' },
         // TCN 繁中 - 青绿系
-        { name: 'TCN英规', values: ['HK', 'MO'],         gradient: 'linear-gradient(135deg, #00695c, #26c6da)', group: 'TCN' },
-        // DE 德语 - 深蓝灰系
-        { name: 'DE欧规',  values: ['AT', 'DE', 'LI'],  gradient: 'linear-gradient(135deg, #1a237e, #5c6bc0)', group: 'DE' },
+        { name: 'TCN英规', flag: '🇭🇰', values: ['HK', 'MO'],         gradient: 'linear-gradient(135deg, #00695c, #26c6da)', group: 'TCN' },
+        // DE 德语 - 深蓝紫系
+        { name: 'DE欧规',  flag: '🇩🇪', values: ['AT', 'DE', 'LI'],  gradient: 'linear-gradient(135deg, #1a237e, #5c6bc0)', group: 'DE' },
         // ES 西语 - 玫红系
-        { name: 'ES欧规',  values: ['ES'],               gradient: 'linear-gradient(135deg, #880e4f, #e91e8c)', group: 'ES' },
+        { name: 'ES欧规',  flag: '🇪🇸', values: ['ES'],               gradient: 'linear-gradient(135deg, #880e4f, #e91e8c)', group: 'ES' },
         // IT 意语 - 黄绿系
-        { name: 'IT欧规',  values: ['IT'],               gradient: 'linear-gradient(135deg, #558b2f, #cddc39)', group: 'IT' },
+        { name: 'IT欧规',  flag: '🇮🇹', values: ['IT'],               gradient: 'linear-gradient(135deg, #558b2f, #cddc39)', group: 'IT' },
     ];
     /********************************************************/
 
-    const BTN_WIDTH  = 108;  // 所有按钮统一宽度 px
+    const BTN_WIDTH  = 118;  // 所有按钮统一宽度 px（留空间给国旗）
     const BTN_HEIGHT = 40;   // 按钮高度 px
-    const BTN_GAP    = 3;    // 同组按钮间距 px（紧密）
-    const GROUP_GAP  = 10;   // 不同组之间的间距 px
+    const BTN_GAP    = 3;    // 按钮间距 px（全部统一，无组间大间距）
     const BTN_RIGHT  = 14;   // 距页面右边距 px
     const BTN_TOP    = 80;   // 第一个按钮距页面顶部 px
 
@@ -87,7 +84,6 @@
     function injectPanel() {
         if (panel) return;
 
-        // 外层容器，fixed 固定在页面右侧，默认隐藏
         panel = document.createElement('div');
         panel.id = 'chris-country-panel';
         panel.style.cssText = `
@@ -97,28 +93,17 @@
             z-index: 2147483647;
             display: none;
             flex-direction: column;
-            gap: 0;
+            gap: ${BTN_GAP}px;
             pointer-events: none;
         `;
 
-        // 按 group 分组，相邻不同组之间插入间距
-        let lastGroup = null;
         BUTTON_CONFIGS.forEach(cfg => {
-            // 组间分隔：插入一个透明间距块
-            if (lastGroup !== null && lastGroup !== cfg.group) {
-                const spacer = document.createElement('div');
-                spacer.style.cssText = `height: ${GROUP_GAP}px; pointer-events: none;`;
-                panel.appendChild(spacer);
-            }
-            lastGroup = cfg.group;
-
-            // 按钮本身
             const btn = document.createElement('button');
-            btn.textContent = '⭐ ' + cfg.name;
+            // 国旗 + 规格名
+            btn.textContent = cfg.flag + ' ' + cfg.name;
             btn.style.cssText = `
                 width: ${BTN_WIDTH}px;
                 height: ${BTN_HEIGHT}px;
-                margin-bottom: ${BTN_GAP}px;
                 border-radius: 8px;
                 border: none;
                 background: ${cfg.gradient};
@@ -126,15 +111,16 @@
                 font-size: 13px;
                 font-weight: 700;
                 font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
-                letter-spacing: 0.5px;
+                letter-spacing: 0.3px;
                 cursor: pointer;
                 box-shadow: 0 3px 10px rgba(0,0,0,0.22);
                 transition: transform 0.12s ease, box-shadow 0.12s ease;
                 pointer-events: auto;
-                text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                text-shadow: 0 1px 3px rgba(0,0,0,0.25);
                 white-space: nowrap;
                 overflow: visible;
                 padding: 0 10px;
+                text-align: center;
             `;
             btn.onmouseover = () => {
                 btn.style.transform = 'scale(1.07) translateX(-2px)';
