@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name          国家选择器
+// @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.1.0
+// @version       2.1.1
 // @description   电源规格国家选择器（支持 mkt + stormsend 双站）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -11,7 +11,7 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家选择器 v2.1.0 启动');
+    console.log('Chris：国家Selector v2.1.1 启动');
 
     /**************** 按钮配置 ****************
      * values : modal型页面用大写，表单型用小写 —— 统一存小写，查找时忽略大小写
