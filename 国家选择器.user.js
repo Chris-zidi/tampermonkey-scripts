@@ -1,17 +1,17 @@
 // ==UserScript==
 // @name          国家选择器
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.0.2
+// @version       2.0.3
 // @description   电源规格国家选择器（支持 mkt + stormsend 双站）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
 // @grant         none
-// @updateURL     https://raw.githubusercontent.com/Chris-zidi/tampermonkey-scripts/main/%E5%9B%BD%E5%AE%B6%E9%80%89%E6%8B%A9%E5%99%A8/%E5%9B%BD%E5%AE%B6%E9%80%89%E6%8B%A9%E5%99%A8.user.js
-// @downloadURL   https://raw.githubusercontent.com/Chris-zidi/tampermonkey-scripts/main/%E5%9B%BD%E5%AE%B6%E9%80%89%E6%8B%A9%E5%99%A8/%E5%9B%BD%E5%AE%B6%E9%80%89%E6%8B%A9%E5%99%A8.user.js
+// @updateURL     https://raw.githubusercontent.com/Chris-zidi/tampermonkey-scripts/main/%E5%9B%BD%E5%AE%B6%E9%80%89%E6%8B%A9%E5%99%A8.user.js
+// @downloadURL   https://raw.githubusercontent.com/Chris-zidi/tampermonkey-scripts/main/%E5%9B%BD%E5%AE%B6%E9%80%89%E6%8B%A9%E5%99%A8.user.js
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家选择器 v2.0.2 启动');
+    console.log('Chris：国家选择器 v2.0.3 启动');
 
     /**************** 按钮配置 ****************
      * values : modal型页面用大写，表单型用小写 —— 统一存小写，查找时忽略大小写
