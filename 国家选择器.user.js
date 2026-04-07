@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.1.1
+// @version       2.2.0
 // @description   电源规格国家选择器（支持 mkt + stormsend 双站）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -11,14 +11,16 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.1.1 启动');
+    console.log('Chris：国家Selector v2.2.0 启动');
 
     /**************** 按钮配置 ****************
-     * values : modal型页面用大写，表单型用小写 —— 统一存小写，查找时忽略大小写
-     * lang   : 表单型页面同时勾选的语言 value
+     * values   : 国家代码（小写），两种页面通用
+     * lang     : 语言代码，支持字符串或数组（表单型页面用）
+     * formOnly : true = 只在 FORM 页面显示（Stormsend）
+     *            不设置或 false = 只在 MODAL 页面显示（mkt）
      ******************************************/
     const BUTTON_CONFIGS = [
-        // EN 英语 - 蓝色系
+        // ── MODAL 专用（mkt 页面，原有 12 个按钮）──────────────────
         { name: 'EN美规',  flag: '⭐', values: ['ph','ca'],
           lang: 'en',
           gradient: 'linear-gradient(160deg, #4fc3f7 0%, #1976d2 50%, #0d47a1 100%)',
@@ -35,17 +37,14 @@
           lang: 'en',
           gradient: 'linear-gradient(160deg, #64b5f6 0%, #1565c0 50%, #0a2e6e 100%)',
           shadow: '0 4px 15px rgba(21,101,192,0.55)', group: 'EN' },
-        // 中规 - 红色系
         { name: '中规',    flag: '⭐', values: ['cn'],
           lang: 'zh-CN',
           gradient: 'linear-gradient(160deg, #ef9a9a 0%, #e53935 50%, #8b0000 100%)',
           shadow: '0 4px 15px rgba(229,57,53,0.55)', group: 'CN' },
-        // 日规 - 朱红橙系
         { name: '日规',    flag: '⭐', values: ['jp'],
           lang: 'ja',
           gradient: 'linear-gradient(160deg, #ffab91 0%, #f4511e 50%, #bf360c 100%)',
           shadow: '0 4px 15px rgba(244,81,30,0.55)', group: 'JP' },
-        // FR 法语 - 橙金系
         { name: 'FR美规',  flag: '⭐', values: ['ca'],
           lang: 'fr',
           gradient: 'linear-gradient(160deg, #ffe082 0%, #ffa000 50%, #e65100 100%)',
@@ -54,26 +53,38 @@
           lang: 'fr',
           gradient: 'linear-gradient(160deg, #ffcc80 0%, #fb8c00 50%, #bf360c 100%)',
           shadow: '0 4px 15px rgba(251,140,0,0.55)', group: 'FR' },
-        // TCN 繁中 - 青绿系
         { name: 'TCN英规', flag: '⭐', values: ['hk','mo'],
           lang: 'zh-TW',
           gradient: 'linear-gradient(160deg, #80deea 0%, #00acc1 50%, #006064 100%)',
           shadow: '0 4px 15px rgba(0,172,193,0.55)', group: 'TCN' },
-        // DE 德语 - 深蓝紫系
         { name: 'DE欧规',  flag: '⭐', values: ['at','de','li'],
           lang: 'de',
           gradient: 'linear-gradient(160deg, #9fa8da 0%, #3949ab 50%, #1a237e 100%)',
           shadow: '0 4px 15px rgba(57,73,171,0.55)', group: 'DE' },
-        // ES 西语 - 玫红紫系
         { name: 'ES欧规',  flag: '⭐', values: ['es'],
           lang: 'es',
           gradient: 'linear-gradient(160deg, #f48fb1 0%, #d81b60 50%, #880e4f 100%)',
           shadow: '0 4px 15px rgba(216,27,96,0.55)', group: 'ES' },
-        // IT 意语 - 翠绿系
         { name: 'IT欧规',  flag: '⭐', values: ['it'],
           lang: 'it',
           gradient: 'linear-gradient(160deg, #a5d6a7 0%, #43a047 50%, #1b5e20 100%)',
           shadow: '0 4px 15px rgba(67,160,71,0.55)', group: 'IT' },
+
+        // ── FORM 专用（Stormsend 页面，收拢为2个大按钮）────────────
+        { name: '通用美规', flag: '⭐', formOnly: true,
+          // EN美规(ph,ca) + FR美规(ca) 去重
+          values: ['ph','ca'],
+          // 同时勾选英语 + 法语
+          lang: ['en','fr'],
+          gradient: 'linear-gradient(160deg, #4fc3f7 0%, #1976d2 50%, #0d47a1 100%)',
+          shadow: '0 4px 15px rgba(25,118,210,0.55)', group: 'FORM' },
+        { name: '通用欧规', flag: '⭐', formOnly: true,
+          // EN欧规 + FR欧规 + DE欧规 + ES欧规 + IT欧规 国家合集（去重）
+          values: ['be','bg','hr','cz','dk','ee','fi','gr','hu','ie','lv','lt','mt','nl','no','pl','pt','ro','sk','si','se','ch','mc','fr','lu','at','de','li','es','it'],
+          // 同时勾选 英/法/德/西/意 5种语言
+          lang: ['en','fr','de','es','it'],
+          gradient: 'linear-gradient(160deg, #ce93d8 0%, #7b1fa2 50%, #4a0072 100%)',
+          shadow: '0 4px 15px rgba(123,31,162,0.55)', group: 'FORM' },
     ];
 
     const BTN_WIDTH  = 118;
@@ -146,33 +157,26 @@
      * FORM 型逻辑
      ***********************************************/
     function applyForm(cfg) {
-        // 国家 checkbox：name="component_instance[countries][]"
+        // 国家 checkbox
         const countryCbs = document.querySelectorAll('input[name="component_instance[countries][]"]');
         countryCbs.forEach(cb => setChecked(cb, false));
         cfg.values.forEach(val => {
-            const cb = findCbByValue(document, val);
-            if (cb && cb.name === 'component_instance[countries][]') {
-                setChecked(cb, true);
-            } else {
-                // 兜底：用 id 查找（id 格式为 user_horizontal_countries_xx）
-                const byId = document.getElementById(`user_horizontal_countries_${val.toLowerCase()}`);
-                if (byId) setChecked(byId, true);
-                else console.warn(`Chris：form 找不到国家 value="${val}"`);
-            }
+            const byId = document.getElementById(`user_horizontal_countries_${val.toLowerCase()}`);
+            if (byId) setChecked(byId, true);
+            else console.warn(`Chris：form 找不到国家 value="${val}"`);
         });
 
-        // 语言 checkbox：name="component_instance[languages][]"
+        // 语言 checkbox（支持字符串或数组）
         const langCbs = document.querySelectorAll('input[name="component_instance[languages][]"]');
         langCbs.forEach(cb => setChecked(cb, false));
-        if (cfg.lang) {
-            // id 格式：user_horizontal_languages_xx
-            const langId = `user_horizontal_languages_${cfg.lang}`;
-            const langCb = document.getElementById(langId);
+        const langs = Array.isArray(cfg.lang) ? cfg.lang : (cfg.lang ? [cfg.lang] : []);
+        langs.forEach(lang => {
+            const langCb = document.getElementById(`user_horizontal_languages_${lang}`);
             if (langCb) setChecked(langCb, true);
-            else console.warn(`Chris：找不到语言 id="${langId}"`);
-        }
+            else console.warn(`Chris：找不到语言 id="user_horizontal_languages_${lang}"`);
+        });
 
-        console.log(`Chris [FORM]：已应用 ${cfg.name}，语言=${cfg.lang}`);
+        console.log(`Chris [FORM]：已应用 ${cfg.name}，语言=${langs.join(',')}`);
     }
 
     /***********************************************
@@ -233,7 +237,12 @@
             pointer-events: none;
         `;
 
-        BUTTON_CONFIGS.forEach(cfg => {
+        // 按页面类型过滤：FORM 只显示 formOnly 按钮，MODAL 只显示非 formOnly 按钮
+        const visibleConfigs = BUTTON_CONFIGS.filter(cfg =>
+            pageType === 'FORM' ? cfg.formOnly === true : !cfg.formOnly
+        );
+
+        visibleConfigs.forEach(cfg => {
             const btn = document.createElement('button');
             btn.className = 'chris-btn';
             btn.textContent = cfg.flag + ' ' + cfg.name;
