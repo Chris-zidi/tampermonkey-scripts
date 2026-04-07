@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家选择器
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       1.4.0
+// @version       1.4.1
 // @description   电源规格国家选择器
 // @author        Chris-zidi
 // @match         *://*/*
@@ -11,31 +11,31 @@
 // ==/UserScript==
 
 (function () {
-    console.log("Chris：国家选择器 v1.4.0 启动");
+    console.log("Chris：国家选择器 v1.4.1 启动");
 
     /**************** 按钮配置（按语种分组，同色系） ****************/
     const BUTTON_CONFIGS = [
         // EN 英语 - 蓝色系
-        { name: 'EN美规',  flag: '🇺🇸', values: ['PH', 'CA'],        gradient: 'linear-gradient(135deg, #1565c0, #42a5f5)', group: 'EN' },
-        { name: 'EN英规',  flag: '🇬🇧', values: ['GB'],               gradient: 'linear-gradient(135deg, #1976d2, #64b5f6)', group: 'EN' },
-        { name: 'EN澳规',  flag: '🇦🇺', values: ['AU'],               gradient: 'linear-gradient(135deg, #0288d1, #4fc3f7)', group: 'EN' },
-        { name: 'EN欧规',  flag: '🇪🇺', values: ['BE','BG','HR','CZ','DK','EE','FI','GR','HU','IE','LV','LT','MT','NL','NO','PL','PT','RO','SK','SI','SE','CH'],
+        { name: 'EN美规',  flag: '⭐', values: ['PH', 'CA'],        gradient: 'linear-gradient(135deg, #1565c0, #42a5f5)', group: 'EN' },
+        { name: 'EN英规',  flag: '⭐', values: ['GB'],               gradient: 'linear-gradient(135deg, #1976d2, #64b5f6)', group: 'EN' },
+        { name: 'EN澳规',  flag: '⭐', values: ['AU'],               gradient: 'linear-gradient(135deg, #0288d1, #4fc3f7)', group: 'EN' },
+        { name: 'EN欧规',  flag: '⭐', values: ['BE','BG','HR','CZ','DK','EE','FI','GR','HU','IE','LV','LT','MT','NL','NO','PL','PT','RO','SK','SI','SE','CH'],
                                                                         gradient: 'linear-gradient(135deg, #01579b, #29b6f6)', group: 'EN' },
         // 中规 - 红色系
-        { name: '中规',    flag: '🇨🇳', values: ['CN'],               gradient: 'linear-gradient(135deg, #c62828, #ef5350)', group: 'CN' },
+        { name: '中规',    flag: '⭐', values: ['CN'],               gradient: 'linear-gradient(135deg, #c62828, #ef5350)', group: 'CN' },
         // 日规 - 朱红系
-        { name: '日规',    flag: '🇯🇵', values: ['JP'],               gradient: 'linear-gradient(135deg, #b71c1c, #ff7043)', group: 'JP' },
+        { name: '日规',    flag: '⭐', values: ['JP'],               gradient: 'linear-gradient(135deg, #b71c1c, #ff7043)', group: 'JP' },
         // FR 法语 - 橙色系
-        { name: 'FR美规',  flag: '🇫🇷', values: ['CA'],               gradient: 'linear-gradient(135deg, #e65100, #ffa726)', group: 'FR' },
-        { name: 'FR欧规',  flag: '🇫🇷', values: ['MC', 'FR', 'LU'],  gradient: 'linear-gradient(135deg, #bf360c, #ff8a65)', group: 'FR' },
+        { name: 'FR美规',  flag: '⭐', values: ['CA'],               gradient: 'linear-gradient(135deg, #e65100, #ffa726)', group: 'FR' },
+        { name: 'FR欧规',  flag: '⭐', values: ['MC', 'FR', 'LU'],  gradient: 'linear-gradient(135deg, #bf360c, #ff8a65)', group: 'FR' },
         // TCN 繁中 - 青绿系
-        { name: 'TCN英规', flag: '🇭🇰', values: ['HK', 'MO'],         gradient: 'linear-gradient(135deg, #00695c, #26c6da)', group: 'TCN' },
+        { name: 'TCN英规', flag: '⭐', values: ['HK', 'MO'],         gradient: 'linear-gradient(135deg, #00695c, #26c6da)', group: 'TCN' },
         // DE 德语 - 深蓝紫系
-        { name: 'DE欧规',  flag: '🇩🇪', values: ['AT', 'DE', 'LI'],  gradient: 'linear-gradient(135deg, #1a237e, #5c6bc0)', group: 'DE' },
+        { name: 'DE欧规',  flag: '⭐', values: ['AT', 'DE', 'LI'],  gradient: 'linear-gradient(135deg, #1a237e, #5c6bc0)', group: 'DE' },
         // ES 西语 - 玫红系
-        { name: 'ES欧规',  flag: '🇪🇸', values: ['ES'],               gradient: 'linear-gradient(135deg, #880e4f, #e91e8c)', group: 'ES' },
+        { name: 'ES欧规',  flag: '⭐', values: ['ES'],               gradient: 'linear-gradient(135deg, #880e4f, #e91e8c)', group: 'ES' },
         // IT 意语 - 黄绿系
-        { name: 'IT欧规',  flag: '🇮🇹', values: ['IT'],               gradient: 'linear-gradient(135deg, #558b2f, #cddc39)', group: 'IT' },
+        { name: 'IT欧规',  flag: '⭐', values: ['IT'],               gradient: 'linear-gradient(135deg, #558b2f, #cddc39)', group: 'IT' },
     ];
     /********************************************************/
 
