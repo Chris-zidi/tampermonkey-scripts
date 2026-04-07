@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家选择器
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       1.2.1
+// @version       1.2.2
 // @description   电源规格国家选择器
 // @author        Chris-zidi
 // @match         *://*/*
@@ -11,7 +11,7 @@
 // ==/UserScript==
 
 (function () {
-    console.log("Chris：国家选择器 v1.2.1 启动");
+    console.log("Chris：国家选择器 v1.2.2 启动");
 
     /**************** 按钮配置 ****************/
     // gradient: CSS 渐变色背景
@@ -136,7 +136,7 @@
             btn.onclick = e => {
                 e.stopPropagation();
                 e.preventDefault();
-                const modal = document.querySelector('.modal.show,[role="dialog"]');
+                const modal = getVisibleModal();
                 if (!modal) {
                     console.warn('Chris：没有找到打开的 modal');
                     return;
@@ -163,8 +163,23 @@
     }
 
     /************** 监听 modal 出现和消失 **************/
+    // 判断条件：[role="dialog"] 存在 + display 不为 none + 内部有 checkbox
+    // 不能用 .modal.show，因为该页面用的是 .modal.fade.in + style="display:block"
+    function getVisibleModal() {
+        const candidates = document.querySelectorAll('[role="dialog"]');
+        for (const el of candidates) {
+            const style = window.getComputedStyle(el);
+            if (style.display !== 'none' && style.visibility !== 'hidden') {
+                if (el.querySelector('input[type="checkbox"]')) {
+                    return el;
+                }
+            }
+        }
+        return null;
+    }
+
     function hasModal() {
-        return !!document.querySelector('.modal.show,[role="dialog"]');
+        return !!getVisibleModal();
     }
 
     const observer = new MutationObserver(() => {
@@ -178,10 +193,15 @@
     // 等 body 就绪后启动监听
     function init() {
         injectPanel();
-        // 如果页面加载时 modal 已经存在，立即显示
+        // 如果页面加载时 modal 已经可见，立即显示
         if (hasModal()) showPanel();
 
-        observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+        observer.observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class', 'style']  // 同时监听 style 变化（display:none/block）
+        });
     }
 
     if (document.body) {
