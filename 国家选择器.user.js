@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家选择器
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       1.0.0
+// @version       1.1.0
 // @description   电源规格国家选择器
 // @author        Chris-zidi
 // @match         *://*/*
@@ -11,147 +11,156 @@
 // ==/UserScript==
 
 (function () {
-    console.log("Chris：国家选择器启动");
+    console.log("Chris：国家选择器 v1.1.0 启动");
 
-    /**************** 配置 ****************/
-    const INJECT_CHECK_INTERVAL = 80;
-    const INJECT_TIMEOUT = 6000;
-    /*************************************/
-
-    // 按钮定义：name=显示文字, values=要勾选的国家代码数组, bg=背景色
+    /**************** 按钮配置 ****************/
+    // gradient: CSS 渐变色背景
     const BUTTON_CONFIGS = [
-        { name: 'EN美规',  values: ['PH', 'CA'],                                                                                              bg: '#e67e22' },
-        { name: 'EN英规',  values: ['GB'],                                                                                                    bg: '#2980b9' },
-        { name: '日规',    values: ['JP'],                                                                                                    bg: '#c0392b' },
-        { name: 'EN澳规',  values: ['AU'],                                                                                                    bg: '#27ae60' },
-        { name: 'EN欧规',  values: ['BE','BG','HR','CZ','DK','EE','FI','GR','HU','IE','LV','LT','MT','NL','NO','PL','PT','RO','SK','SI','SE','CH'], bg: '#8e44ad' },
-        { name: '中规',    values: ['CN'],                                                                                                    bg: '#e74c3c' },
-        { name: 'FR美规',  values: ['CA'],                                                                                                    bg: '#d35400' },
-        { name: 'FR欧规',  values: ['MC', 'FR', 'LU'],                                                                                       bg: '#2c3e50' },
-        { name: 'TCN英规', values: ['HK', 'MO'],                                                                                             bg: '#16a085' },
-        { name: 'DE欧规',  values: ['AT', 'DE', 'LI'],                                                                                       bg: '#7f8c8d' },
-        { name: 'ES欧规',  values: ['ES'],                                                                                                    bg: '#c0392b' },
-        { name: 'IT欧规',  values: ['IT'],                                                                                                    bg: '#f39c12' },
+        { name: 'EN美规',  values: ['PH', 'CA'],
+          gradient: 'linear-gradient(135deg, #f7971e, #ffd200)' },
+        { name: 'EN英规',  values: ['GB'],
+          gradient: 'linear-gradient(135deg, #1a6fc4, #2196f3)' },
+        { name: '日规',    values: ['JP'],
+          gradient: 'linear-gradient(135deg, #c0392b, #e74c3c)' },
+        { name: 'EN澳规',  values: ['AU'],
+          gradient: 'linear-gradient(135deg, #11998e, #38ef7d)' },
+        { name: 'EN欧规',  values: ['BE','BG','HR','CZ','DK','EE','FI','GR','HU','IE','LV','LT','MT','NL','NO','PL','PT','RO','SK','SI','SE','CH'],
+          gradient: 'linear-gradient(135deg, #6a11cb, #a855f7)' },
+        { name: '中规',    values: ['CN'],
+          gradient: 'linear-gradient(135deg, #e52d27, #b31217)' },
+        { name: 'FR美规',  values: ['CA'],
+          gradient: 'linear-gradient(135deg, #f46b45, #eea849)' },
+        { name: 'FR欧规',  values: ['MC', 'FR', 'LU'],
+          gradient: 'linear-gradient(135deg, #1f3c6e, #2c5282)' },
+        { name: 'TCN英规', values: ['HK', 'MO'],
+          gradient: 'linear-gradient(135deg, #00b09b, #00d2ff)' },
+        { name: 'DE欧规',  values: ['AT', 'DE', 'LI'],
+          gradient: 'linear-gradient(135deg, #4b6cb7, #182848)' },
+        { name: 'ES欧规',  values: ['ES'],
+          gradient: 'linear-gradient(135deg, #c94b4b, #4b134f)' },
+        { name: 'IT欧规',  values: ['IT'],
+          gradient: 'linear-gradient(135deg, #f7971e, #21d4fd)' },
     ];
+    /******************************************/
 
-    const BTN_HEIGHT = 32;   // 每个按钮的高度
-    const BTN_GAP    = 6;    // 按钮之间的间距
-    const BTN_TOP    = 12;   // 第一个按钮距顶部
+    const BTN_WIDTH  = 96;   // 所有按钮统一宽度 px
+    const BTN_HEIGHT = 44;   // 按钮高度 px
+    const BTN_GAP    = 6;    // 按钮间距 px
+    const BTN_RIGHT  = 14;   // 距页面右边距 px
+    const BTN_TOP    = 80;   // 第一个按钮距页面顶部 px
 
-    /************** checkbox 工具 **************/
+    /************** checkbox 操作（只改属性，不触发事件，避免自动提交） **************/
 
-    // 找到 checkbox 对应的 label 元素
-    function findLabelForInput(input) {
-        if (!input) return null;
-        if (input.id) {
-            const l = document.querySelector(`label[for="${CSS.escape(input.id)}"]`);
-            if (l) return l;
-        }
-        return input.closest('label');
-    }
-
-    // 模拟真人点击：通过 label 或 checkbox 本身点击，并派发 change/input 事件
-    function clickCheckbox(checkbox) {
-        if (!checkbox) return;
-        const label = findLabelForInput(checkbox);
-        if (label) {
-            label.click();
-        } else {
-            checkbox.click();
-        }
-        checkbox.dispatchEvent(new Event('change', { bubbles: true }));
-        checkbox.dispatchEvent(new Event('input',  { bubbles: true }));
-    }
-
-    // 获取 modal 内所有 checkbox
     function getAllCheckboxes(modal) {
         return Array.from(modal.querySelectorAll('input[type="checkbox"]'));
     }
 
-    // 根据 value 属性找到 checkbox
     function findCheckboxByValue(modal, value) {
         return modal.querySelector(`input[type="checkbox"][value="${value}"]`);
     }
 
+    // 直接修改 checked 属性，不调用 .click()，不派发任何事件
+    // 这样页面 UI 会正确更新 checkbox 状态，但不会触发页面绑定的自动提交逻辑
+    function setChecked(checkbox, state) {
+        if (!checkbox) return;
+        checkbox.checked = !!state;
+    }
+
     /************** 核心逻辑：先全部取消，再勾选目标 **************/
     function applySelection(modal, targetValues) {
-        const all = getAllCheckboxes(modal);
-
-        // 第一步：取消所有已勾选的 checkbox
-        all.forEach(cb => {
-            if (cb.checked) clickCheckbox(cb);
-        });
+        // 第一步：取消所有 checkbox
+        getAllCheckboxes(modal).forEach(cb => setChecked(cb, false));
 
         // 第二步：勾选目标国家
         targetValues.forEach(val => {
             const cb = findCheckboxByValue(modal, val);
-            if (cb && !cb.checked) {
-                clickCheckbox(cb);
-            } else if (!cb) {
+            if (cb) {
+                setChecked(cb, true);
+            } else {
                 console.warn(`Chris：找不到 value="${val}" 的 checkbox`);
             }
         });
     }
 
-    /************** 注入按钮 **************/
-    function injectButtonsIntoModal(modal) {
-        if (modal.dataset.chrisInjected) return;
-        if (getComputedStyle(modal).position === 'static') modal.style.position = 'relative';
+    /************** 注入固定悬浮按钮面板 **************/
+    let panelInjected = false;
 
-        BUTTON_CONFIGS.forEach((cfg, i) => {
-            const top = BTN_TOP + i * (BTN_HEIGHT + BTN_GAP);
+    function injectPanel() {
+        if (panelInjected) return;
+        panelInjected = true;
+
+        // 外层容器，fixed 固定在页面右侧
+        const panel = document.createElement('div');
+        panel.id = 'chris-country-panel';
+        panel.style.cssText = `
+            position: fixed;
+            right: ${BTN_RIGHT}px;
+            top: ${BTN_TOP}px;
+            z-index: 2147483647;
+            display: flex;
+            flex-direction: column;
+            gap: ${BTN_GAP}px;
+            pointer-events: none;
+        `;
+
+        BUTTON_CONFIGS.forEach(cfg => {
             const btn = document.createElement('button');
-            btn.textContent = cfg.name;
+            btn.textContent = '⭐ ' + cfg.name;
             btn.style.cssText = `
-                position: absolute;
-                right: 12px;
-                top: ${top}px;
-                z-index: 2147483647;
-                padding: 4px 10px;
+                width: ${BTN_WIDTH}px;
                 height: ${BTN_HEIGHT}px;
-                border-radius: 6px;
+                border-radius: 10px;
                 border: none;
-                font-weight: 600;
-                cursor: pointer;
-                box-shadow: 0 3px 10px rgba(0,0,0,.18);
-                transition: transform .14s ease, opacity .14s ease;
-                font-size: 12px;
-                background: ${cfg.bg};
+                background: ${cfg.gradient};
                 color: #fff;
+                font-size: 14px;
+                font-weight: 700;
+                font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+                letter-spacing: 0.5px;
+                cursor: pointer;
+                box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+                transition: transform 0.12s ease, box-shadow 0.12s ease;
+                pointer-events: auto;
+                text-shadow: 0 1px 3px rgba(0,0,0,0.3);
                 white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                padding: 0 8px;
             `;
-            btn.onmouseover = () => { btn.style.transform = 'scale(1.06)'; btn.style.opacity = '0.92'; };
-            btn.onmouseout  = () => { btn.style.transform = 'scale(1)';    btn.style.opacity = '1';    };
+            btn.onmouseover = () => {
+                btn.style.transform = 'scale(1.08) translateX(-2px)';
+                btn.style.boxShadow = '0 6px 20px rgba(0,0,0,0.35)';
+            };
+            btn.onmouseout = () => {
+                btn.style.transform = 'scale(1) translateX(0)';
+                btn.style.boxShadow = '0 4px 14px rgba(0,0,0,0.25)';
+            };
             btn.onclick = e => {
                 e.stopPropagation();
+                e.preventDefault();
+                // 找当前打开的 modal
+                const modal = document.querySelector('.modal.show,[role="dialog"]');
+                if (!modal) {
+                    console.warn('Chris：没有找到打开的 modal');
+                    return;
+                }
                 applySelection(modal, cfg.values);
                 console.log(`Chris：已应用 ${cfg.name}（${cfg.values.join(',')}）`);
+                // 按钮短暂缩小给视觉反馈
+                btn.style.transform = 'scale(0.93)';
+                setTimeout(() => { btn.style.transform = 'scale(1)'; }, 140);
             };
-            modal.appendChild(btn);
+            panel.appendChild(btn);
         });
 
-        modal.dataset.chrisInjected = '1';
+        document.body.appendChild(panel);
     }
 
-    /************** 监听 modal 出现 **************/
-    function ensureInjection(modal) {
-        if (modal.dataset.chrisInjecting) return;
-        modal.dataset.chrisInjecting = '1';
-
-        const poll = setInterval(() => {
-            if (modal.querySelector('input[type="checkbox"]')) {
-                clearInterval(poll);
-                injectButtonsIntoModal(modal);
-            }
-        }, INJECT_CHECK_INTERVAL);
-
-        setTimeout(() => clearInterval(poll), INJECT_TIMEOUT);
+    /************** 等 body 就绪后注入面板 **************/
+    if (document.body) {
+        injectPanel();
+    } else {
+        document.addEventListener('DOMContentLoaded', injectPanel);
     }
-
-    const observer = new MutationObserver(() => {
-        document.querySelectorAll('.modal.show,[role="dialog"]').forEach(ensureInjection);
-    });
-
-    observer.observe(document.documentElement, { childList: true, subtree: true });
 
 })();
