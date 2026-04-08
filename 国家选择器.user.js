@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.3.1
+// @version       2.4.0
 // @description   电源规格国家选择器（支持 mkt + stormsend 双站）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -11,7 +11,7 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.3.1 启动');
+    console.log('Chris：国家Selector v2.4.0 启动');
 
     /**************** 按钮配置 ****************
      * values   : 国家代码（小写）
@@ -131,7 +131,9 @@
     }
 
     /***********************************************
-     * MODAL 型逻辑
+     * MODAL 型逻辑（mkt 页面）
+     * 通过 React 组件实例的 updateCountries 方法直接更新数据
+     * 路径：modal 父级 → textarea[readonly] → React _owner._instance
      ***********************************************/
     function getVisibleModal() {
         for (const el of document.querySelectorAll('[role="dialog"]')) {
@@ -143,19 +145,37 @@
         return null;
     }
 
+    function getReactInstance(modal) {
+        const parent = modal.parentElement;
+        if (!parent) return null;
+        const textarea = parent.querySelector('textarea[readonly]');
+        if (!textarea) return null;
+        const rk = Object.keys(textarea).find(k => k.startsWith('__reactInternalInstance'));
+        if (!rk) return null;
+        const owner = textarea[rk]._currentElement?._owner;
+        return owner?._instance || null;
+    }
+
     function applyModal(cfg) {
         const modal = getVisibleModal();
         if (!modal) { console.warn('Chris：没有找到打开的 modal'); return; }
-        // 取消所有 checkbox（排除"是否上线"等非国家checkbox，但 modal 里应该只有国家）
-        Array.from(modal.querySelectorAll('input[type="checkbox"]'))
-            .forEach(cb => setChecked(cb, false));
-        // 勾选目标国家
-        cfg.values.forEach(val => {
-            const cb = findCbByValue(modal, val);
-            if (cb) setChecked(cb, true);
-            else console.warn(`Chris：modal 找不到 value="${val}"`);
-        });
-        console.log(`Chris [MODAL]：已应用 ${cfg.name}`);
+
+        const instance = getReactInstance(modal);
+        if (instance && typeof instance.updateCountries === 'function') {
+            // 将小写国家代码转为大写（React 组件用大写）
+            const upperValues = cfg.values.map(v => v.toUpperCase());
+            instance.updateCountries(upperValues);
+            console.log(`Chris [MODAL]：已通过 React updateCountries 应用 ${cfg.name}（${upperValues.join(',')}）`);
+        } else {
+            // 降级方案：直接设 checked（视觉生效但关闭后可能不生效）
+            console.warn('Chris [MODAL]：未找到 React 实例，降级为 checked 方式');
+            Array.from(modal.querySelectorAll('input[type="checkbox"]'))
+                .forEach(cb => { cb.checked = false; });
+            cfg.values.forEach(val => {
+                const cb = findCbByValue(modal, val);
+                if (cb) cb.checked = true;
+            });
+        }
     }
 
     /***********************************************
