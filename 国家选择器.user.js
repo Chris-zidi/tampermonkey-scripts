@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.4.0
+// @version       2.4.1
 // @description   电源规格国家选择器（支持 mkt + stormsend 双站）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -11,7 +11,7 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.4.0 启动');
+    console.log('Chris：国家Selector v2.4.1 启动');
 
     /**************** 按钮配置 ****************
      * values   : 国家代码（小写）
@@ -161,11 +161,13 @@
         if (!modal) { console.warn('Chris：没有找到打开的 modal'); return; }
 
         const instance = getReactInstance(modal);
-        if (instance && typeof instance.updateCountries === 'function') {
+        if (instance && instance.state && instance.state.selectedCountries) {
             // 将小写国家代码转为大写（React 组件用大写）
             const upperValues = cfg.values.map(v => v.toUpperCase());
-            instance.updateCountries(upperValues);
-            console.log(`Chris [MODAL]：已通过 React updateCountries 应用 ${cfg.name}（${upperValues.join(',')}）`);
+            instance.setState({ selectedCountries: upperValues }, function() {
+                instance.forceUpdate();
+            });
+            console.log(`Chris [MODAL]：已通过 React setState 应用 ${cfg.name}（${upperValues.join(',')}）`);
         } else {
             // 降级方案：直接设 checked（视觉生效但关闭后可能不生效）
             console.warn('Chris [MODAL]：未找到 React 实例，降级为 checked 方式');
