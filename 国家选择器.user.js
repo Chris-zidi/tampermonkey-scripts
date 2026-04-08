@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.3.0
+// @version       2.3.1
 // @description   电源规格国家选择器（支持 mkt + stormsend 双站）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -11,7 +11,7 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.3.0 启动');
+    console.log('Chris：国家Selector v2.3.1 启动');
 
     /**************** 按钮配置 ****************
      * values   : 国家代码（小写）
@@ -27,9 +27,9 @@
           lang: 'en',
           gradient: 'linear-gradient(160deg, #4fc3f7 0%, #1976d2 50%, #0d47a1 100%)',
           shadow: '0 4px 15px rgba(25,118,210,0.55)', group: 'EN' },
-        // EN英规：两个页面都显示
-        { name: 'EN英规',  flag: '⭐', values: ['gb'],
-          lang: 'en',
+        // EN英规 + TCN英规 合并为通用英规：两个页面都显示
+        { name: '通用英规', flag: '⭐', values: ['gb','hk','mo'],
+          lang: ['en','zh-TW'],
           gradient: 'linear-gradient(160deg, #81d4fa 0%, #0288d1 50%, #01579b 100%)',
           shadow: '0 4px 15px rgba(2,136,209,0.55)', group: 'EN' },
         // EN澳规：两个页面都显示
@@ -61,11 +61,6 @@
           lang: 'fr',
           gradient: 'linear-gradient(160deg, #ffcc80 0%, #fb8c00 50%, #bf360c 100%)',
           shadow: '0 4px 15px rgba(251,140,0,0.55)', group: 'FR' },
-        // ── TCN 繁中 - 青绿系 ──────────────────────────────────────
-        { name: 'TCN英规', flag: '⭐', values: ['hk','mo'],
-          lang: 'zh-TW',
-          gradient: 'linear-gradient(160deg, #80deea 0%, #00acc1 50%, #006064 100%)',
-          shadow: '0 4px 15px rgba(0,172,193,0.55)', group: 'TCN' },
         // ── DE 德语 - 深蓝紫系（仅 mkt）──────────────────────────
         { name: 'DE欧规',  flag: '⭐', formOnly: false, values: ['at','de','li'],
           lang: 'de',
