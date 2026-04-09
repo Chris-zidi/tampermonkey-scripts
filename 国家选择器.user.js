@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.5.0
+// @version       2.5.1
 // @description   电源规格国家选择器（支持 mkt + stormsend 双站）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -11,7 +11,7 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.5.0 启动');
+    console.log('Chris：国家Selector v2.5.1 启动');
 
     /**************** 按钮配置 ****************
      * values   : 国家代码（小写）
@@ -261,29 +261,27 @@
             pointer-events: none;
         `;
 
-        // 收起/展开箭头按钮（默认收起：箭头朝左 ‹，展开后朝右 ›）
+        // 收起/展开箭头按钮（默认展开，箭头旋转180度）
         const toggleBtn = document.createElement('button');
         toggleBtn.id = 'chris-toggle-btn';
         toggleBtn.textContent = '›';
         toggleBtn.title = '展开/收起';
+        toggleBtn.style.transform = 'rotate(180deg)';
 
-        // 按钮列表容器，默认收起
+        // 按钮列表容器，默认展开
         const btnList = document.createElement('div');
         btnList.id = 'chris-btn-list';
-        btnList.classList.add('collapsed');
 
-        let expanded = false;
+        let expanded = true;
         toggleBtn.onclick = e => {
             e.stopPropagation();
             e.preventDefault();
             expanded = !expanded;
             if (expanded) {
                 btnList.classList.remove('collapsed');
-                toggleBtn.textContent = '›'; // 展开时箭头朝右（点击收起）
                 toggleBtn.style.transform = 'rotate(180deg)';
             } else {
                 btnList.classList.add('collapsed');
-                toggleBtn.textContent = '›';
                 toggleBtn.style.transform = 'rotate(0deg)';
             }
         };
