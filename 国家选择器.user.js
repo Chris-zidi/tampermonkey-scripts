@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.6.1
+// @version       2.7.0
 // @description   电源规格国家选择器（支持 mkt + stormsend 双站）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -11,7 +11,7 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.6.1 启动');
+    console.log('Chris：国家Selector v2.7.0 启动');
 
     /**************** 按钮配置 ****************
      * values   : 国家代码（小写）
@@ -21,12 +21,12 @@
      *            不设置 = 两个页面都显示
      ******************************************/
     const BUTTON_CONFIGS = [
-        // ══════════ 通用合集（两个页面都显示）══════════════════════
-        { name: '通用美规', flag: '⭐', values: ['ph','ca'],
+        // ══════════ 通用合集（仅 Stormsend）══════════════════════
+        { name: '通用美规', flag: '⭐', formOnly: true, values: ['ph','ca'],
           lang: ['en','fr'],
           gradient: 'linear-gradient(160deg, #4fc3f7 0%, #1976d2 50%, #0d47a1 100%)',
           shadow: '0 4px 15px rgba(25,118,210,0.55)', group: 'EN' },
-        { name: '通用英规', flag: '⭐', values: ['gb','hk','mo','ie','mt'],
+        { name: '通用英规', flag: '⭐', formOnly: true, values: ['gb','hk','mo','ie','mt'],
           lang: ['en','zh-TW'],
           gradient: 'linear-gradient(160deg, #81d4fa 0%, #0288d1 50%, #01579b 100%)',
           shadow: '0 4px 15px rgba(2,136,209,0.55)', group: 'EN' },
@@ -34,7 +34,7 @@
           lang: 'en',
           gradient: 'linear-gradient(160deg, #b3e5fc 0%, #039be5 50%, #0277bd 100%)',
           shadow: '0 4px 15px rgba(3,155,229,0.55)', group: 'EN' },
-        { name: '通用欧规', flag: '⭐',
+        { name: '通用欧规', flag: '⭐', formOnly: true,
           values: ['be','bg','hr','cz','dk','ee','fi','gr','hu','lv','lt','nl','no','pl','pt','ro','sk','si','se','ch','mc','fr','lu','at','de','li','es','it'],
           lang: ['en','fr','de','es','it'],
           gradient: 'linear-gradient(160deg, #ce93d8 0%, #7b1fa2 50%, #4a0072 100%)',
