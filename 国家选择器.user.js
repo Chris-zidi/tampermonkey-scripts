@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.5.1
+// @version       2.6.0
 // @description   电源规格国家选择器（支持 mkt + stormsend 双站）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -11,7 +11,7 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.5.1 启动');
+    console.log('Chris：国家Selector v2.6.0 启动');
 
     /**************** 按钮配置 ****************
      * values   : 国家代码（小写）
@@ -21,37 +21,79 @@
      *            不设置 = 两个页面都显示
      ******************************************/
     const BUTTON_CONFIGS = [
-        // ── 通用美规 = EN美规(ph,ca) + FR美规(ca) ─ 两个页面都显示 ──
+        // ══════════ 通用合集（两个页面都显示）══════════════════════
         { name: '通用美规', flag: '⭐', values: ['ph','ca'],
           lang: ['en','fr'],
           gradient: 'linear-gradient(160deg, #4fc3f7 0%, #1976d2 50%, #0d47a1 100%)',
           shadow: '0 4px 15px rgba(25,118,210,0.55)', group: 'EN' },
-        // ── 通用英规 = EN英规(gb) + TCN英规(hk,mo) ─ 两个页面都显示 ──
         { name: '通用英规', flag: '⭐', values: ['gb','hk','mo'],
           lang: ['en','zh-TW'],
           gradient: 'linear-gradient(160deg, #81d4fa 0%, #0288d1 50%, #01579b 100%)',
           shadow: '0 4px 15px rgba(2,136,209,0.55)', group: 'EN' },
-        // ── EN澳规 ─ 两个页面都显示 ────────────────────────────────
         { name: 'EN澳规',  flag: '⭐', values: ['au'],
           lang: 'en',
           gradient: 'linear-gradient(160deg, #b3e5fc 0%, #039be5 50%, #0277bd 100%)',
           shadow: '0 4px 15px rgba(3,155,229,0.55)', group: 'EN' },
-        // ── 通用欧规 = EN+FR+DE+ES+IT欧规合集 ─ 两个页面都显示 ─────
         { name: '通用欧规', flag: '⭐',
           values: ['be','bg','hr','cz','dk','ee','fi','gr','hu','ie','lv','lt','mt','nl','no','pl','pt','ro','sk','si','se','ch','mc','fr','lu','at','de','li','es','it'],
           lang: ['en','fr','de','es','it'],
           gradient: 'linear-gradient(160deg, #ce93d8 0%, #7b1fa2 50%, #4a0072 100%)',
           shadow: '0 4px 15px rgba(123,31,162,0.55)', group: 'EU' },
-        // ── 中规 ─ 两个页面都显示 ───────────────────────────────────
         { name: '中规',    flag: '⭐', values: ['cn'],
           lang: 'zh-CN',
           gradient: 'linear-gradient(160deg, #ef9a9a 0%, #e53935 50%, #8b0000 100%)',
           shadow: '0 4px 15px rgba(229,57,53,0.55)', group: 'CN' },
-        // ── 日规 ─ 两个页面都显示 ───────────────────────────────────
         { name: '日规',    flag: '⭐', values: ['jp'],
           lang: 'ja',
           gradient: 'linear-gradient(160deg, #ffab91 0%, #f4511e 50%, #bf360c 100%)',
           shadow: '0 4px 15px rgba(244,81,30,0.55)', group: 'JP' },
+
+        // ══════════ 单独规格（两个页面都显示）══════════════════════
+        // EN美规
+        { name: 'EN美规',  flag: '⭐', values: ['ph','ca'],
+          lang: 'en',
+          gradient: 'linear-gradient(160deg, #4fc3f7 0%, #1976d2 50%, #0d47a1 100%)',
+          shadow: '0 4px 15px rgba(25,118,210,0.55)', group: 'EN' },
+        // FR美规
+        { name: 'FR美规',  flag: '⭐', values: ['ca'],
+          lang: 'fr',
+          gradient: 'linear-gradient(160deg, #ffe082 0%, #ffa000 50%, #e65100 100%)',
+          shadow: '0 4px 15px rgba(255,160,0,0.55)', group: 'FR' },
+        // EN欧规
+        { name: 'EN欧规',  flag: '⭐', values: ['be','bg','hr','cz','dk','ee','fi','gr','hu','ie','lv','lt','mt','nl','no','pl','pt','ro','sk','si','se','ch'],
+          lang: 'en',
+          gradient: 'linear-gradient(160deg, #64b5f6 0%, #1565c0 50%, #0a2e6e 100%)',
+          shadow: '0 4px 15px rgba(21,101,192,0.55)', group: 'EN' },
+        // FR欧规
+        { name: 'FR欧规',  flag: '⭐', values: ['mc','fr','lu'],
+          lang: 'fr',
+          gradient: 'linear-gradient(160deg, #ffcc80 0%, #fb8c00 50%, #bf360c 100%)',
+          shadow: '0 4px 15px rgba(251,140,0,0.55)', group: 'FR' },
+        // DE欧规
+        { name: 'DE欧规',  flag: '⭐', values: ['at','de','li'],
+          lang: 'de',
+          gradient: 'linear-gradient(160deg, #9fa8da 0%, #3949ab 50%, #1a237e 100%)',
+          shadow: '0 4px 15px rgba(57,73,171,0.55)', group: 'DE' },
+        // ES欧规
+        { name: 'ES欧规',  flag: '⭐', values: ['es'],
+          lang: 'es',
+          gradient: 'linear-gradient(160deg, #f48fb1 0%, #d81b60 50%, #880e4f 100%)',
+          shadow: '0 4px 15px rgba(216,27,96,0.55)', group: 'ES' },
+        // IT欧规
+        { name: 'IT欧规',  flag: '⭐', values: ['it'],
+          lang: 'it',
+          gradient: 'linear-gradient(160deg, #a5d6a7 0%, #43a047 50%, #1b5e20 100%)',
+          shadow: '0 4px 15px rgba(67,160,71,0.55)', group: 'IT' },
+        // TCN英规
+        { name: 'TCN英规', flag: '⭐', values: ['hk','mo'],
+          lang: 'zh-TW',
+          gradient: 'linear-gradient(160deg, #80deea 0%, #00acc1 50%, #006064 100%)',
+          shadow: '0 4px 15px rgba(0,172,193,0.55)', group: 'TCN' },
+        // EN英规
+        { name: 'EN英规',  flag: '⭐', values: ['gb'],
+          lang: 'en',
+          gradient: 'linear-gradient(160deg, #81d4fa 0%, #0288d1 50%, #01579b 100%)',
+          shadow: '0 4px 15px rgba(2,136,209,0.55)', group: 'EN' },
     ];
 
     const BTN_WIDTH  = 118;
