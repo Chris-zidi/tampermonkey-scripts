@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.7.0
-// @description   电源规格国家选择器（支持 mkt + stormsend 双站）
+// @version       2.8.0
+// @description   电源规格国家选择器（支持 mkt弹窗 + mkt表单 + stormsend 三种页面）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
 // @grant         none
@@ -11,7 +11,7 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.7.0 启动');
+    console.log('Chris：国家Selector v2.8.0 启动');
 
     /**************** 按钮配置 ****************
      * values   : 国家代码（小写）
@@ -104,13 +104,18 @@
 
     /***********************************************
      * 页面类型检测
-     * - MODAL  : mkt.djiits.com，checkbox 在弹窗里，value 大写
-     * - FORM   : stormsend.djiits.com，checkbox 直接在页面，有 id 前缀 user_horizontal_countries_
+     * - MODAL    : mkt.djiits.com core_selling_points，checkbox 在弹窗里
+     * - FORM     : stormsend.djiits.com，checkbox 直接在页面，有语言选择
+     * - FORM_MKT : mkt.djiits.com EAN 等页面，checkbox 直接在页面，无语言选择，React 组件
      ***********************************************/
     function detectPageType() {
-        // 表单型特征：有 name="component_instance[countries][]" 的 checkbox
+        // Stormsend 表单型
         if (document.querySelector('input[name="component_instance[countries][]"]')) {
             return 'FORM';
+        }
+        // mkt EAN 等表单型（checkbox 直接在页面，不在 modal 里）
+        if (document.querySelector('input[name="ean[country_codes][]"]')) {
+            return 'FORM_MKT';
         }
         return 'MODAL';
     }
@@ -208,6 +213,40 @@
         });
 
         console.log(`Chris [FORM]：已应用 ${cfg.name}，语言=${langs.join(',')}`);
+    }
+
+    /***********************************************
+     * FORM_MKT 型逻辑（mkt EAN 等页面，React 组件）
+     * 从 checkbox 的 _owner 链获取 React 实例，用 setState 更新
+     ***********************************************/
+    function getReactInstanceFromCheckbox(checkboxName) {
+        const cb = document.querySelector(`input[name="${checkboxName}"]`);
+        if (!cb) return null;
+        const rk = Object.keys(cb).find(k => k.startsWith('__reactInternalInstance'));
+        if (!rk) return null;
+        let current = cb[rk]._currentElement?._owner;
+        let d = 0;
+        while (current && d < 10) {
+            if (current._instance && current._instance.state && current._instance.state.selectedCountries) {
+                return current._instance;
+            }
+            current = current._currentElement?._owner;
+            d++;
+        }
+        return null;
+    }
+
+    function applyFormMkt(cfg) {
+        const instance = getReactInstanceFromCheckbox('ean[country_codes][]');
+        if (instance) {
+            const upperValues = cfg.values.map(v => v.toUpperCase());
+            instance.setState({ selectedCountries: upperValues }, function() {
+                instance.forceUpdate();
+            });
+            console.log(`Chris [FORM_MKT]：已通过 React setState 应用 ${cfg.name}（${upperValues.join(',')}）`);
+        } else {
+            console.warn('Chris [FORM_MKT]：未找到 React 实例');
+        }
     }
 
     /***********************************************
@@ -329,6 +368,10 @@
         };
 
         // 过滤逻辑
+        // formOnly: true  → 只在 FORM（Stormsend）显示
+        // formOnly: false → 只在 MODAL 显示
+        // 未设置          → 所有页面都显示
+        // FORM_MKT 页面：显示未设置的（单独规格）+ 不显示 formOnly:true（通用版无语言意义）
         const visibleConfigs = BUTTON_CONFIGS.filter(cfg => {
             if (cfg.formOnly === true)  return pageType === 'FORM';
             if (cfg.formOnly === false) return pageType === 'MODAL';
@@ -374,6 +417,7 @@
                 e.stopPropagation();
                 e.preventDefault();
                 if (pageType === 'FORM') applyForm(cfg);
+                else if (pageType === 'FORM_MKT') applyFormMkt(cfg);
                 else applyModal(cfg);
                 btn.style.transform = 'scale(0.92)';
                 btn.style.filter = 'brightness(0.9)';
@@ -408,7 +452,7 @@
 
         injectPanel(pageType);
 
-        if (pageType === 'FORM') {
+        if (pageType === 'FORM' || pageType === 'FORM_MKT') {
             // 表单型：直接常驻显示
             showPanel();
 
