@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.6.0
+// @version       2.6.1
 // @description   电源规格国家选择器（支持 mkt + stormsend 双站）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -11,7 +11,7 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.6.0 启动');
+    console.log('Chris：国家Selector v2.6.1 启动');
 
     /**************** 按钮配置 ****************
      * values   : 国家代码（小写）
@@ -26,7 +26,7 @@
           lang: ['en','fr'],
           gradient: 'linear-gradient(160deg, #4fc3f7 0%, #1976d2 50%, #0d47a1 100%)',
           shadow: '0 4px 15px rgba(25,118,210,0.55)', group: 'EN' },
-        { name: '通用英规', flag: '⭐', values: ['gb','hk','mo'],
+        { name: '通用英规', flag: '⭐', values: ['gb','hk','mo','ie','mt'],
           lang: ['en','zh-TW'],
           gradient: 'linear-gradient(160deg, #81d4fa 0%, #0288d1 50%, #01579b 100%)',
           shadow: '0 4px 15px rgba(2,136,209,0.55)', group: 'EN' },
@@ -35,7 +35,7 @@
           gradient: 'linear-gradient(160deg, #b3e5fc 0%, #039be5 50%, #0277bd 100%)',
           shadow: '0 4px 15px rgba(3,155,229,0.55)', group: 'EN' },
         { name: '通用欧规', flag: '⭐',
-          values: ['be','bg','hr','cz','dk','ee','fi','gr','hu','ie','lv','lt','mt','nl','no','pl','pt','ro','sk','si','se','ch','mc','fr','lu','at','de','li','es','it'],
+          values: ['be','bg','hr','cz','dk','ee','fi','gr','hu','lv','lt','nl','no','pl','pt','ro','sk','si','se','ch','mc','fr','lu','at','de','li','es','it'],
           lang: ['en','fr','de','es','it'],
           gradient: 'linear-gradient(160deg, #ce93d8 0%, #7b1fa2 50%, #4a0072 100%)',
           shadow: '0 4px 15px rgba(123,31,162,0.55)', group: 'EU' },
@@ -60,7 +60,7 @@
           gradient: 'linear-gradient(160deg, #ffe082 0%, #ffa000 50%, #e65100 100%)',
           shadow: '0 4px 15px rgba(255,160,0,0.55)', group: 'FR' },
         // EN欧规
-        { name: 'EN欧规',  flag: '⭐', values: ['be','bg','hr','cz','dk','ee','fi','gr','hu','ie','lv','lt','mt','nl','no','pl','pt','ro','sk','si','se','ch'],
+        { name: 'EN欧规',  flag: '⭐', values: ['be','bg','hr','cz','dk','ee','fi','gr','hu','lv','lt','nl','no','pl','pt','ro','sk','si','se','ch'],
           lang: 'en',
           gradient: 'linear-gradient(160deg, #64b5f6 0%, #1565c0 50%, #0a2e6e 100%)',
           shadow: '0 4px 15px rgba(21,101,192,0.55)', group: 'EN' },
@@ -90,7 +90,7 @@
           gradient: 'linear-gradient(160deg, #80deea 0%, #00acc1 50%, #006064 100%)',
           shadow: '0 4px 15px rgba(0,172,193,0.55)', group: 'TCN' },
         // EN英规
-        { name: 'EN英规',  flag: '⭐', values: ['gb'],
+        { name: 'EN英规',  flag: '⭐', values: ['gb','ie','mt'],
           lang: 'en',
           gradient: 'linear-gradient(160deg, #81d4fa 0%, #0288d1 50%, #01579b 100%)',
           shadow: '0 4px 15px rgba(2,136,209,0.55)', group: 'EN' },
