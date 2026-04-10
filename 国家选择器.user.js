@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.8.1
+// @version       2.8.2
 // @description   电源规格国家选择器（支持 mkt弹窗 + mkt表单 + stormsend 三种页面）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -11,7 +11,7 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.8.1 启动');
+    console.log('Chris：国家Selector v2.8.2 启动');
 
     /**************** 按钮配置 ****************
      * values    : 国家代码（小写）
@@ -56,19 +56,19 @@
 
         // ── 欧规系 ─────────────────────────────────────────────────
         { name: '通用欧规', flag: '⭐', showIn: ['FORM','FORM_MKT'],
-          values: ['be','bg','hr','cz','dk','ee','fi','gr','hu','lv','lt','nl','no','pl','pt','ro','sk','si','se','ch','mc','fr','lu','at','de','li','es','it'],
+          values: ['be','bg','hr','cz','dk','ee','fi','gr','hu','lv','lt','nl','pl','pt','ro','sk','si','se','fr','lu','at','de','es','it'],
           lang: ['en','fr','de','es','it'],
           gradient: 'linear-gradient(160deg, #ce93d8 0%, #7b1fa2 50%, #4a0072 100%)',
           shadow: '0 4px 15px rgba(123,31,162,0.55)' },
-        { name: 'EN欧规',  flag: '⭐', values: ['be','bg','hr','cz','dk','ee','fi','gr','hu','lv','lt','nl','no','pl','pt','ro','sk','si','se','ch'],
+        { name: 'EN欧规',  flag: '⭐', values: ['be','bg','hr','cz','dk','ee','fi','gr','hu','lv','lt','nl','pl','pt','ro','sk','si','se'],
           lang: 'en',
           gradient: 'linear-gradient(160deg, #64b5f6 0%, #1565c0 50%, #0a2e6e 100%)',
           shadow: '0 4px 15px rgba(21,101,192,0.55)' },
-        { name: 'FR欧规',  flag: '⭐', values: ['mc','fr','lu'],
+        { name: 'FR欧规',  flag: '⭐', values: ['fr','lu'],
           lang: 'fr',
           gradient: 'linear-gradient(160deg, #ffcc80 0%, #fb8c00 50%, #bf360c 100%)',
           shadow: '0 4px 15px rgba(251,140,0,0.55)' },
-        { name: 'DE欧规',  flag: '⭐', values: ['at','de','li'],
+        { name: 'DE欧规',  flag: '⭐', values: ['at','de'],
           lang: 'de',
           gradient: 'linear-gradient(160deg, #9fa8da 0%, #3949ab 50%, #1a237e 100%)',
           shadow: '0 4px 15px rgba(57,73,171,0.55)' },
