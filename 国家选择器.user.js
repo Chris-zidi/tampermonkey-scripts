@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.9.1
+// @version       2.9.2
 // @description   电源规格国家选择器（支持 mkt弹窗 + mkt表单 + stormsend 三种页面）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -30,8 +30,8 @@
           shadow: '0 4px 15px rgba(25,118,210,0.55)' },
         { name: '通用英规', flag: '⭐', showIn: ['FORM','FORM_MKT'], values: ['gb','hk','mo','ie','mt'],
           lang: ['en','zh-TW'],
-          gradient: 'linear-gradient(160deg, #81d4fa 0%, #0288d1 50%, #01579b 100%)',
-          shadow: '0 4px 15px rgba(2,136,209,0.55)' },
+          gradient: 'linear-gradient(160deg, #80cbc4 0%, #00897b 50%, #004d40 100%)',
+          shadow: '0 4px 15px rgba(0,137,123,0.55)' },
         { name: '通用欧规', flag: '⭐', showIn: ['FORM','FORM_MKT'],
           values: ['be','bg','hr','cz','dk','ee','fi','gr','hu','lv','lt','nl','pl','pt','ro','sk','si','se','fr','lu','at','de','es','it'],
           lang: ['en','fr','de','es','it'],
