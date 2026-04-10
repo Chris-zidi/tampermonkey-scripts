@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.8.2
+// @version       2.9.0
 // @description   电源规格国家选择器（支持 mkt弹窗 + mkt表单 + stormsend 三种页面）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -11,7 +11,10 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.8.2 启动');
+    console.log('Chris：国家Selector v2.9.0 启动');
+
+    /**************** 累加模式（默认关闭）****************/
+    let accumulateMode = false;
 
     /**************** 按钮配置 ****************
      * values    : 国家代码（小写）
@@ -169,17 +172,25 @@
 
         const instance = getReactInstance(modal);
         if (instance && instance.state && instance.state.selectedCountries) {
-            // 将小写国家代码转为大写（React 组件用大写）
             const upperValues = cfg.values.map(v => v.toUpperCase());
-            instance.setState({ selectedCountries: upperValues }, function() {
+            let newValues;
+            if (accumulateMode) {
+                // 累加模式：合并去重
+                newValues = [...new Set([...instance.state.selectedCountries, ...upperValues])];
+            } else {
+                // 替换模式
+                newValues = upperValues;
+            }
+            instance.setState({ selectedCountries: newValues }, function() {
                 instance.forceUpdate();
             });
-            console.log(`Chris [MODAL]：已通过 React setState 应用 ${cfg.name}（${upperValues.join(',')}）`);
+            console.log(`Chris [MODAL${accumulateMode ? '/累加' : ''}]：已应用 ${cfg.name}（${newValues.join(',')}）`);
         } else {
-            // 降级方案：直接设 checked（视觉生效但关闭后可能不生效）
             console.warn('Chris [MODAL]：未找到 React 实例，降级为 checked 方式');
-            Array.from(modal.querySelectorAll('input[type="checkbox"]'))
-                .forEach(cb => { cb.checked = false; });
+            if (!accumulateMode) {
+                Array.from(modal.querySelectorAll('input[type="checkbox"]'))
+                    .forEach(cb => { cb.checked = false; });
+            }
             cfg.values.forEach(val => {
                 const cb = findCbByValue(modal, val);
                 if (cb) cb.checked = true;
@@ -193,7 +204,7 @@
     function applyForm(cfg) {
         // 国家 checkbox
         const countryCbs = document.querySelectorAll('input[name="component_instance[countries][]"]');
-        countryCbs.forEach(cb => setChecked(cb, false));
+        if (!accumulateMode) countryCbs.forEach(cb => setChecked(cb, false));
         cfg.values.forEach(val => {
             const byId = document.getElementById(`user_horizontal_countries_${val.toLowerCase()}`);
             if (byId) setChecked(byId, true);
@@ -202,7 +213,7 @@
 
         // 语言 checkbox（支持字符串或数组）
         const langCbs = document.querySelectorAll('input[name="component_instance[languages][]"]');
-        langCbs.forEach(cb => setChecked(cb, false));
+        if (!accumulateMode) langCbs.forEach(cb => setChecked(cb, false));
         const langs = Array.isArray(cfg.lang) ? cfg.lang : (cfg.lang ? [cfg.lang] : []);
         langs.forEach(lang => {
             const langCb = document.getElementById(`user_horizontal_languages_${lang}`);
@@ -210,7 +221,7 @@
             else console.warn(`Chris：找不到语言 id="user_horizontal_languages_${lang}"`);
         });
 
-        console.log(`Chris [FORM]：已应用 ${cfg.name}，语言=${langs.join(',')}`);
+        console.log(`Chris [FORM${accumulateMode ? '/累加' : ''}]：已应用 ${cfg.name}，语言=${langs.join(',')}`);
     }
 
     /***********************************************
@@ -238,10 +249,16 @@
         const instance = getReactInstanceFromCheckbox('ean[country_codes][]');
         if (instance) {
             const upperValues = cfg.values.map(v => v.toUpperCase());
-            instance.setState({ selectedCountries: upperValues }, function() {
+            let newValues;
+            if (accumulateMode) {
+                newValues = [...new Set([...instance.state.selectedCountries, ...upperValues])];
+            } else {
+                newValues = upperValues;
+            }
+            instance.setState({ selectedCountries: newValues }, function() {
                 instance.forceUpdate();
             });
-            console.log(`Chris [FORM_MKT]：已通过 React setState 应用 ${cfg.name}（${upperValues.join(',')}）`);
+            console.log(`Chris [FORM_MKT${accumulateMode ? '/累加' : ''}]：已应用 ${cfg.name}（${newValues.join(',')}）`);
         } else {
             console.warn('Chris [FORM_MKT]：未找到 React 实例');
         }
@@ -299,6 +316,32 @@
                 margin-bottom: 4px;
             }
             #chris-toggle-btn:hover { background: #fff; transform: scale(1.1); }
+            /* 累加模式开关 */
+            #chris-accumulate-btn {
+                width: ${BTN_WIDTH}px;
+                height: 30px;
+                border-radius: 6px;
+                border: 2px solid rgba(255,255,255,0.5);
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 700;
+                font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+                pointer-events: auto;
+                transition: all 0.2s ease;
+                margin-bottom: 6px;
+                text-align: center;
+                letter-spacing: 0.5px;
+            }
+            #chris-accumulate-btn.off {
+                background: rgba(120,120,120,0.7);
+                color: rgba(255,255,255,0.8);
+            }
+            #chris-accumulate-btn.on {
+                background: linear-gradient(135deg, #43a047, #66bb6a);
+                color: #fff;
+                border-color: rgba(255,255,255,0.7);
+                box-shadow: 0 0 12px rgba(67,160,71,0.5);
+            }
             #chris-btn-list {
                 display: flex;
                 flex-direction: column;
@@ -365,6 +408,25 @@
             }
         };
 
+        // 累加模式开关按钮（默认关闭）
+        const accBtn = document.createElement('button');
+        accBtn.id = 'chris-accumulate-btn';
+        accBtn.className = 'off';
+        accBtn.textContent = '累加：关';
+        accBtn.onclick = e => {
+            e.stopPropagation();
+            e.preventDefault();
+            accumulateMode = !accumulateMode;
+            if (accumulateMode) {
+                accBtn.className = 'on';
+                accBtn.textContent = '累加：开';
+            } else {
+                accBtn.className = 'off';
+                accBtn.textContent = '累加：关';
+            }
+            console.log(`Chris：累加模式 ${accumulateMode ? '开启' : '关闭'}`);
+        };
+
         // 过滤逻辑
         // showIn 数组：指定在哪些页面显示，不设置则所有页面都显示
         const visibleConfigs = BUTTON_CONFIGS.filter(cfg => {
@@ -424,6 +486,7 @@
         });
 
         panel.appendChild(toggleBtn);
+        btnList.insertBefore(accBtn, btnList.firstChild);
         panel.appendChild(btnList);
         document.body.appendChild(panel);
     }
