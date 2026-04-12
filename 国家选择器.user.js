@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.9.3
+// @version       2.9.4
 // @description   电源规格国家选择器（支持 mkt弹窗 + mkt表单 + stormsend 三种页面）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -11,7 +11,7 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.9.3 启动');
+    console.log('Chris：国家Selector v2.9.4 启动');
 
     /**************** 累加模式（默认关闭）****************/
     let accumulateMode = false;
@@ -206,16 +206,20 @@
             const upperValues = cfg.values.map(v => v.toUpperCase());
             let newValues;
             if (accumulateMode) {
-                // 累加模式：合并去重
                 newValues = [...new Set([...instance.state.selectedCountries, ...upperValues])];
             } else {
-                // 替换模式
                 newValues = upperValues;
             }
-            instance.setState({ selectedCountries: newValues }, function() {
-                instance.forceUpdate();
-            });
-            console.log(`Chris [MODAL${accumulateMode ? '/累加' : ''}]：已应用 ${cfg.name}（${newValues.join(',')}）`);
+            // 优先用 updateCountries（in_the_boxes 等页面需要），没有再降级用 setState
+            if (typeof instance.updateCountries === 'function') {
+                instance.updateCountries(newValues);
+                console.log(`Chris [MODAL/updateCountries${accumulateMode ? '/累加' : ''}]：已应用 ${cfg.name}（${newValues.join(',')}）`);
+            } else {
+                instance.setState({ selectedCountries: newValues }, function() {
+                    instance.forceUpdate();
+                });
+                console.log(`Chris [MODAL/setState${accumulateMode ? '/累加' : ''}]：已应用 ${cfg.name}（${newValues.join(',')}）`);
+            }
         } else {
             console.warn('Chris [MODAL]：未找到 React 实例，降级为 checked 方式');
             if (!accumulateMode) {
