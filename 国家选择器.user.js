@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.9.4
+// @version       2.9.5
 // @description   电源规格国家选择器（支持 mkt弹窗 + mkt表单 + stormsend 三种页面）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -24,19 +24,23 @@
      ******************************************/
     const BUTTON_CONFIGS = [
         // ── 通用系（排最前）─────────────────────────────────────────
-        { name: '通用美规', flag: '⭐', showIn: ['FORM','FORM_MKT'], values: ['ph','ca'],
+        { name: '通用美规', flag: '⭐', values: ['ph','ca'],
           lang: ['en','fr'],
           gradient: 'linear-gradient(160deg, #4fc3f7 0%, #1976d2 50%, #0d47a1 100%)',
           shadow: '0 4px 15px rgba(25,118,210,0.55)' },
-        { name: '通用英规', flag: '⭐', showIn: ['FORM','FORM_MKT'], values: ['gb','hk','mo','ie','mt'],
+        { name: '通用英规', flag: '⭐', values: ['gb','hk','mo','ie','mt'],
           lang: ['en','zh-TW'],
           gradient: 'linear-gradient(160deg, #80cbc4 0%, #00897b 50%, #004d40 100%)',
           shadow: '0 4px 15px rgba(0,137,123,0.55)' },
-        { name: '通用欧规', flag: '⭐', showIn: ['FORM','FORM_MKT'],
+        { name: '通用欧规', flag: '⭐',
           values: ['be','bg','hr','cz','dk','ee','fi','gr','hu','lv','lt','nl','pl','pt','ro','sk','si','se','fr','lu','at','de','es','it'],
           lang: ['en','fr','de','es','it'],
           gradient: 'linear-gradient(160deg, #ce93d8 0%, #7b1fa2 50%, #4a0072 100%)',
           shadow: '0 4px 15px rgba(123,31,162,0.55)' },
+        { name: '通用澳规', flag: '⭐', values: ['au'],
+          lang: 'en',
+          gradient: 'linear-gradient(160deg, #ffcc80 0%, #ef6c00 50%, #bf360c 100%)',
+          shadow: '0 4px 15px rgba(239,108,0,0.55)' },
 
         // ── EN 英语系 ───────────────────────────────────────────────
         { name: 'EN美规',  flag: '⭐', values: ['ph','ca'],
@@ -47,10 +51,6 @@
           lang: 'en',
           gradient: 'linear-gradient(160deg, #81d4fa 0%, #0288d1 50%, #01579b 100%)',
           shadow: '0 4px 15px rgba(2,136,209,0.55)' },
-        { name: 'EN澳规',  flag: '⭐', values: ['au'],
-          lang: 'en',
-          gradient: 'linear-gradient(160deg, #b3e5fc 0%, #039be5 50%, #0277bd 100%)',
-          shadow: '0 4px 15px rgba(3,155,229,0.55)' },
         { name: 'EN欧规',  flag: '⭐', values: ['be','bg','hr','cz','dk','ee','fi','gr','hu','lv','lt','nl','pl','pt','ro','sk','si','se'],
           lang: 'en',
           gradient: 'linear-gradient(160deg, #64b5f6 0%, #1565c0 50%, #0a2e6e 100%)',
