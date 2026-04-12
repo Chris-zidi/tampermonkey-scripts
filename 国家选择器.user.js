@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.9.2
+// @version       2.9.3
 // @description   电源规格国家选择器（支持 mkt弹窗 + mkt表单 + stormsend 三种页面）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -11,7 +11,7 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.9.1 启动');
+    console.log('Chris：国家Selector v2.9.3 启动');
 
     /**************** 累加模式（默认关闭）****************/
     let accumulateMode = false;
@@ -162,14 +162,39 @@
     }
 
     function getReactInstance(modal) {
+        // 方法1：从 textarea 的 _owner 链找（core_selling_points 页面）
         const parent = modal.parentElement;
-        if (!parent) return null;
-        const textarea = parent.querySelector('textarea[readonly]');
-        if (!textarea) return null;
-        const rk = Object.keys(textarea).find(k => k.startsWith('__reactInternalInstance'));
-        if (!rk) return null;
-        const owner = textarea[rk]._currentElement?._owner;
-        return owner?._instance || null;
+        if (parent) {
+            const textarea = parent.querySelector('textarea[readonly]');
+            if (textarea) {
+                const rk = Object.keys(textarea).find(k => k.startsWith('__reactInternalInstance'));
+                if (rk) {
+                    const owner = textarea[rk]._currentElement?._owner;
+                    if (owner?._instance?.state?.selectedCountries) {
+                        return owner._instance;
+                    }
+                }
+            }
+        }
+
+        // 方法2：从 modal 内任意 checkbox 的 _owner 链找（in_the_boxes 等页面）
+        const cb = modal.querySelector('input[type="checkbox"]');
+        if (cb) {
+            const crk = Object.keys(cb).find(k => k.startsWith('__reactInternalInstance'));
+            if (crk) {
+                let current = cb[crk]._currentElement?._owner;
+                let d = 0;
+                while (current && d < 10) {
+                    if (current._instance?.state?.selectedCountries) {
+                        return current._instance;
+                    }
+                    current = current._currentElement?._owner;
+                    d++;
+                }
+            }
+        }
+
+        return null;
     }
 
     function applyModal(cfg) {
