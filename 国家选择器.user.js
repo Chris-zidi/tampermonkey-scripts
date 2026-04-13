@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.11.0
+// @version       2.11.1
 // @description   电源规格国家选择器（支持 mkt弹窗 + mkt表单 + stormsend + sales_ban 四种页面）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -64,6 +64,16 @@
           lang: 'en',
           gradient: 'linear-gradient(160deg, #ffcc80 0%, #ef6c00 50%, #bf360c 100%)',
           shadow: '0 4px 15px rgba(239,108,0,0.55)' },
+
+        // ── 组合按钮 ─────────────────────────────────────────────────
+        { name: '美澳',    flag: '⭐', values: ['ph','ca','au'],
+          lang: ['en','fr'],
+          gradient: 'linear-gradient(160deg, #4dd0e1 0%, #0097a7 50%, #006064 100%)',
+          shadow: '0 4px 15px rgba(0,151,167,0.55)' },
+        { name: '欧英',    flag: '⭐', values: ['be','bg','hr','cz','dk','ee','fi','gr','hu','lv','lt','nl','pl','pt','ro','sk','si','se','fr','lu','at','de','es','it','gb','hk','mo','ie','mt'],
+          lang: ['en','fr','de','es','it','zh-TW'],
+          gradient: 'linear-gradient(160deg, #b39ddb 0%, #512da8 50%, #311b92 100%)',
+          shadow: '0 4px 15px rgba(81,45,168,0.55)' },
 
         // ── EN 英语系 ───────────────────────────────────────────────
         { name: 'EN美规',  flag: '⭐', values: ['ph','ca'],
