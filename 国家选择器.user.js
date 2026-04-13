@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.10.0
+// @version       2.11.0
 // @description   电源规格国家选择器（支持 mkt弹窗 + mkt表单 + stormsend + sales_ban 四种页面）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -11,10 +11,13 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.10.0 启动');
+    console.log('Chris：国家Selector v2.11.0 启动');
 
     /**************** 累加模式（默认关闭）****************/
     let accumulateMode = false;
+
+    /**************** Sales Ban：记录最近操作的 Timed Sale 国家 ****************/
+    let lastTimedCountries = [];
 
     /**************** 国家代码 → 英文名映射（Sales Ban 页面用）****************/
     const COUNTRY_NAME_MAP = {
@@ -329,7 +332,7 @@
     function applySalesBan(cfg) {
         const items = document.querySelectorAll('.country-item');
         const skipped = [];
-        let applied = 0;
+        const applied = [];
 
         cfg.values.forEach(code => {
             const countryName = COUNTRY_NAME_MAP[code.toLowerCase()];
@@ -356,24 +359,87 @@
                 return;
             }
 
-            // 已经是 Timed Sale → 静默跳过
+            // 已经是 Timed Sale → 记录（也需要应用时间）
             if (timedLabel?.classList.contains('ant-radio-button-wrapper-checked')) {
+                applied.push(countryName);
                 return;
             }
 
             // 点击 Timed Sale
             if (timedLabel) {
                 timedLabel.click();
-                applied++;
+                applied.push(countryName);
             }
         });
+
+        // 记录到全局变量（供"应用时间"使用）
+        lastTimedCountries = applied.slice();
 
         // 弹出提示
         if (skipped.length > 0) {
             alert('以下国家已经是 On Sale 状态，不能切换：\n\n' + skipped.join('\n'));
         }
 
-        console.log(`Chris [SALES_BAN]：已应用 ${cfg.name}，切换=${applied}个，跳过OnSale=${skipped.length}个`);
+        console.log(`Chris [SALES_BAN]：已应用 ${cfg.name}，Timed Sale=${applied.length}个，跳过OnSale=${skipped.length}个`);
+    }
+
+    /***********************************************
+     * SALES_BAN：应用时间到 Timed Sale 国家的输入框
+     ***********************************************/
+    function applyTimeToCountries(timeValue) {
+        if (!timeValue.trim()) {
+            alert('请先输入时间');
+            return;
+        }
+
+        const items = document.querySelectorAll('.country-item');
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+
+        // 如果没有记录过国家，就对所有当前 Timed Sale 的国家操作
+        let targetCountries = lastTimedCountries;
+        if (targetCountries.length === 0) {
+            targetCountries = [];
+            items.forEach(item => {
+                const labels = item.querySelectorAll('.ant-radio-button-wrapper');
+                const isTimed = [...labels].find(l => l.textContent.trim() === 'Timed Sale' && l.classList.contains('ant-radio-button-wrapper-checked'));
+                if (isTimed) {
+                    const name = item.querySelector('.ant-col-6')?.textContent?.trim();
+                    if (name) targetCountries.push(name);
+                }
+            });
+            if (targetCountries.length === 0) {
+                alert('没有找到 Timed Sale 状态的国家');
+                return;
+            }
+            if (!confirm(`没有记录到最近操作的国家。\n是否对所有 ${targetCountries.length} 个 Timed Sale 国家应用此时间？`)) {
+                return;
+            }
+        }
+
+        let applied = 0;
+        targetCountries.forEach(countryName => {
+            const item = [...items].find(el =>
+                el.querySelector('.ant-col-6')?.textContent?.trim() === countryName
+            );
+            if (!item) return;
+
+            // 确认当前是 Timed Sale 状态
+            const labels = item.querySelectorAll('.ant-radio-button-wrapper');
+            const isTimed = [...labels].find(l => l.textContent.trim() === 'Timed Sale' && l.classList.contains('ant-radio-button-wrapper-checked'));
+            if (!isTimed) return;
+
+            // 找到时间输入框
+            const timeInput = item.querySelector('input.form-control');
+            if (!timeInput) return;
+
+            // 用 nativeInputValueSetter 修改
+            setter.call(timeInput, timeValue);
+            timeInput.dispatchEvent(new Event('input', { bubbles: true }));
+            timeInput.dispatchEvent(new Event('change', { bubbles: true }));
+            applied++;
+        });
+
+        console.log(`Chris [SALES_BAN]：已应用时间 "${timeValue}" 到 ${applied}/${targetCountries.length} 个国家`);
     }
 
     /***********************************************
@@ -454,6 +520,40 @@
                 border-color: rgba(255,255,255,0.7);
                 box-shadow: 0 0 12px rgba(67,160,71,0.5);
             }
+            /* Sales Ban 时间输入框 */
+            #chris-time-input {
+                width: ${BTN_WIDTH}px;
+                height: 28px;
+                border-radius: 6px;
+                border: 2px solid rgba(255,255,255,0.5);
+                background: rgba(255,255,255,0.92);
+                color: #333;
+                font-size: 10px;
+                font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+                padding: 0 6px;
+                pointer-events: auto;
+                box-sizing: border-box;
+                outline: none;
+                margin-bottom: 3px;
+            }
+            #chris-time-input:focus { border-color: #43a047; box-shadow: 0 0 6px rgba(67,160,71,0.4); }
+            #chris-time-apply-btn {
+                width: ${BTN_WIDTH}px;
+                height: 30px;
+                border-radius: 6px;
+                border: none;
+                background: linear-gradient(135deg, #43a047, #2e7d32);
+                color: #fff;
+                font-size: 12px;
+                font-weight: 700;
+                font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+                cursor: pointer;
+                pointer-events: auto;
+                transition: all 0.15s ease;
+                margin-bottom: 6px;
+                box-shadow: 0 3px 10px rgba(46,125,50,0.35);
+            }
+            #chris-time-apply-btn:hover { filter: brightness(1.15); transform: scale(1.03); }
             #chris-btn-list {
                 display: flex;
                 flex-direction: column;
@@ -600,6 +700,34 @@
 
         panel.appendChild(toggleBtn);
         btnList.insertBefore(accBtn, btnList.firstChild);
+
+        // Sales Ban 页面专属：时间输入框 + 应用按钮
+        if (pageType === 'SALES_BAN') {
+            const timeInput = document.createElement('input');
+            timeInput.id = 'chris-time-input';
+            timeInput.type = 'text';
+            timeInput.placeholder = '2026-04-13 19:50:00 +0800';
+
+            const timeApplyBtn = document.createElement('button');
+            timeApplyBtn.id = 'chris-time-apply-btn';
+            timeApplyBtn.textContent = '⏰ 应用时间';
+            timeApplyBtn.onclick = e => {
+                e.stopPropagation();
+                e.preventDefault();
+                applyTimeToCountries(timeInput.value);
+            };
+
+            // 插入到累加按钮后面（规格按钮前面）
+            const firstCfgBtn = btnList.querySelector('.chris-btn');
+            if (firstCfgBtn) {
+                btnList.insertBefore(timeInput, firstCfgBtn);
+                btnList.insertBefore(timeApplyBtn, firstCfgBtn);
+            } else {
+                btnList.appendChild(timeInput);
+                btnList.appendChild(timeApplyBtn);
+            }
+        }
+
         panel.appendChild(btnList);
         document.body.appendChild(panel);
     }
