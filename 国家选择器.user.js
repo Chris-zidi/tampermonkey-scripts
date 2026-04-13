@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.9.5
-// @description   电源规格国家选择器（支持 mkt弹窗 + mkt表单 + stormsend 三种页面）
+// @version       2.10.0
+// @description   电源规格国家选择器（支持 mkt弹窗 + mkt表单 + stormsend + sales_ban 四种页面）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
 // @grant         none
@@ -11,10 +11,30 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.9.4 启动');
+    console.log('Chris：国家Selector v2.10.0 启动');
 
     /**************** 累加模式（默认关闭）****************/
     let accumulateMode = false;
+
+    /**************** 国家代码 → 英文名映射（Sales Ban 页面用）****************/
+    const COUNTRY_NAME_MAP = {
+        'cn': 'China', 'hk': 'Hong Kong', 'id': 'Indonesia', 'jp': 'Japan',
+        'kr': 'Korea (Republic of)', 'mo': 'Macao', 'my': 'Malaysia', 'ph': 'Philippines',
+        'sg': 'Singapore', 'tw': 'Taiwan, Province of China', 'th': 'Thailand',
+        'au': 'Australia', 'nz': 'New Zealand',
+        'at': 'Austria', 'be': 'Belgium', 'bg': 'Bulgaria', 'hr': 'Croatia',
+        'cz': 'Czech Republic', 'dk': 'Denmark', 'ee': 'Estonia', 'fi': 'Finland',
+        'fr': 'France', 'de': 'Germany', 'gr': 'Greece', 'hu': 'Hungary',
+        'ie': 'Ireland', 'it': 'Italy', 'lv': 'Latvia', 'li': 'Liechtenstein',
+        'lt': 'Lithuania', 'lu': 'Luxembourg', 'mt': 'Malta', 'mc': 'Monaco',
+        'nl': 'Netherlands', 'no': 'Norway', 'pl': 'Poland', 'pt': 'Portugal',
+        'ro': 'Romania', 'sk': 'Slovakia', 'si': 'Slovenia', 'es': 'Spain',
+        'se': 'Sweden', 'ch': 'Switzerland',
+        'gb': 'United Kingdom of Great Britain and Northern Ireland',
+        'ru': 'Russia', 'ae': 'United Arab Emirates',
+        'ca': 'Canada', 'mx': 'Mexico', 'pr': 'Puerto Rico', 'us': 'United States of America',
+        'br': 'Brazil'
+    };
 
     /**************** 按钮配置 ****************
      * values    : 国家代码（小写）
@@ -111,18 +131,20 @@
 
     /***********************************************
      * 页面类型检测
-     * - MODAL    : mkt.djiits.com core_selling_points，checkbox 在弹窗里
-     * - FORM     : stormsend.djiits.com，checkbox 直接在页面，有语言选择
-     * - FORM_MKT : mkt.djiits.com EAN 等页面，checkbox 直接在页面，无语言选择，React 组件
+     * - MODAL     : mkt.djiits.com core_selling_points，checkbox 在弹窗里
+     * - FORM      : stormsend.djiits.com，checkbox 直接在页面，有语言选择
+     * - FORM_MKT  : mkt.djiits.com EAN 等页面，checkbox 直接在页面，React 组件
+     * - SALES_BAN : mkt.djiits.com sales_bans 页面，radio 按钮选择销售状态
      ***********************************************/
     function detectPageType() {
-        // Stormsend 表单型
         if (document.querySelector('input[name="component_instance[countries][]"]')) {
             return 'FORM';
         }
-        // mkt EAN 等表单型（checkbox 直接在页面，不在 modal 里）
         if (document.querySelector('input[name="ean[country_codes][]"]')) {
             return 'FORM_MKT';
+        }
+        if (document.querySelector('.country-item') && document.querySelector('.set-all-sale-time')) {
+            return 'SALES_BAN';
         }
         return 'MODAL';
     }
@@ -297,6 +319,61 @@
         } else {
             console.warn('Chris [FORM_MKT]：未找到 React 实例');
         }
+    }
+
+    /***********************************************
+     * SALES_BAN 型逻辑（mkt sales_bans 页面）
+     * 通过国家名匹配 .country-item，点击 Timed Sale radio
+     * 已经是 On Sale 的国家会被跳过并弹出提示
+     ***********************************************/
+    function applySalesBan(cfg) {
+        const items = document.querySelectorAll('.country-item');
+        const skipped = [];
+        let applied = 0;
+
+        cfg.values.forEach(code => {
+            const countryName = COUNTRY_NAME_MAP[code.toLowerCase()];
+            if (!countryName) {
+                console.warn(`Chris [SALES_BAN]：找不到国家代码 "${code}" 的映射`);
+                return;
+            }
+
+            const item = [...items].find(el =>
+                el.querySelector('.ant-col-6')?.textContent?.trim() === countryName
+            );
+            if (!item) {
+                console.warn(`Chris [SALES_BAN]：页面上找不到国家 "${countryName}"`);
+                return;
+            }
+
+            const labels = item.querySelectorAll('.ant-radio-button-wrapper');
+            const onSaleLabel = [...labels].find(l => l.textContent.trim() === 'On Sale');
+            const timedLabel = [...labels].find(l => l.textContent.trim() === 'Timed Sale');
+
+            // 已经是 On Sale → 跳过并记录
+            if (onSaleLabel?.classList.contains('ant-radio-button-wrapper-checked')) {
+                skipped.push(countryName);
+                return;
+            }
+
+            // 已经是 Timed Sale → 静默跳过
+            if (timedLabel?.classList.contains('ant-radio-button-wrapper-checked')) {
+                return;
+            }
+
+            // 点击 Timed Sale
+            if (timedLabel) {
+                timedLabel.click();
+                applied++;
+            }
+        });
+
+        // 弹出提示
+        if (skipped.length > 0) {
+            alert('以下国家已经是 On Sale 状态，不能切换：\n\n' + skipped.join('\n'));
+        }
+
+        console.log(`Chris [SALES_BAN]：已应用 ${cfg.name}，切换=${applied}个，跳过OnSale=${skipped.length}个`);
     }
 
     /***********************************************
@@ -509,6 +586,7 @@
                 e.preventDefault();
                 if (pageType === 'FORM') applyForm(cfg);
                 else if (pageType === 'FORM_MKT') applyFormMkt(cfg);
+                else if (pageType === 'SALES_BAN') applySalesBan(cfg);
                 else applyModal(cfg);
                 btn.style.transform = 'scale(0.92)';
                 btn.style.filter = 'brightness(0.9)';
@@ -544,7 +622,7 @@
 
         injectPanel(pageType);
 
-        if (pageType === 'FORM' || pageType === 'FORM_MKT') {
+        if (pageType === 'FORM' || pageType === 'FORM_MKT' || pageType === 'SALES_BAN') {
             // 表单型：直接常驻显示
             showPanel();
 
