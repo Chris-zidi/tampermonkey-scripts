@@ -1,0 +1,577 @@
+// ==UserScript==
+// @name         DJI 语种快速切换2
+// @namespace    https://store.dji.com/
+// @version      4.1.0
+// @description  在 DJI 商城及后台编辑页右侧注入语种快捷切换按钮面板
+// @author       o-park.chen
+// @match        https://store.dji.com/*
+// @match        https://stag-www-reactor.dbeta.me/*
+// @match        https://www-reactor.dji.com/*
+// @grant        none
+// @run-at       document-end
+// @updateURL    https://raw.githubusercontent.com/Chris-zidi/tampermonkey-scripts/main/dji-store-lang-switcher.user.js
+// @downloadURL  https://raw.githubusercontent.com/Chris-zidi/tampermonkey-scripts/main/dji-store-lang-switcher.user.js
+// ==/UserScript==
+
+(function () {
+  'use strict';
+
+  // ── 语种配置（数据来自弹窗 a.switchcountry_click 实测）────
+  // path:   URL 路径段；美国特殊，无前缀，path 为 null
+  // region: set_region 参数值，所有地区都需要
+  // sub:    同一语种多个国家时展开子菜单
+  const LANGS = [
+    {
+      label: '中文',
+      path: 'cn', region: 'CN',
+      gradient: 'linear-gradient(135deg, #f6a623, #f97316)',
+    },
+    {
+      label: '繁體中文',
+      path: 'hk', region: 'HK',
+      gradient: 'linear-gradient(135deg, #a78bfa, #ec4899)',
+      sub: [
+        { label: '香港',   path: 'hk', region: 'HK' },
+        { label: '台灣',   path: 'tw', region: 'TW' },
+        { label: '澳門',   path: 'mo', region: 'MO' },
+      ],
+    },
+    {
+      label: 'English',
+      path: 'hk-en', region: 'HK',
+      gradient: 'linear-gradient(135deg, #34d399, #06b6d4)',
+      sub: [
+        { label: 'Hong Kong (EN)', path: 'hk-en', region: 'HK' },
+        { label: 'United States',    path: null,    region: 'US' },
+        { label: 'United Kingdom',   path: 'uk',    region: 'GB' },
+        { label: 'Australia',        path: 'au',    region: 'AU' },
+        { label: 'Canada',           path: 'ca',    region: 'CA' },
+        { label: 'Singapore',        path: 'sg',    region: 'SG' },
+        { label: 'New Zealand',      path: 'nz',    region: 'NZ' },
+        { label: 'Philippines',      path: 'ph',    region: 'PH' },
+        { label: 'Puerto Rico',      path: 'pr',    region: 'PR' },
+        { label: 'Belgium',          path: 'be',    region: 'BE' },
+        { label: 'Bulgaria',         path: 'bg',    region: 'BG' },
+        { label: 'Croatia',          path: 'hr',    region: 'HR' },
+        { label: 'Czech Republic',   path: 'cz',    region: 'CZ' },
+        { label: 'Denmark',          path: 'dk',    region: 'DK' },
+        { label: 'Estonia',          path: 'ee',    region: 'EE' },
+        { label: 'Finland',          path: 'fi',    region: 'FI' },
+        { label: 'Greece',           path: 'gr',    region: 'GR' },
+        { label: 'Hungary',          path: 'hu',    region: 'HU' },
+        { label: 'Ireland',          path: 'ie',    region: 'IE' },
+        { label: 'Latvia',           path: 'lv',    region: 'LV' },
+        { label: 'Lithuania',        path: 'lt',    region: 'LT' },
+        { label: 'Malta',            path: 'mt',    region: 'MT' },
+        { label: 'Netherlands',      path: 'nl',    region: 'NL' },
+        { label: 'Norway',           path: 'no',    region: 'NO' },
+        { label: 'Poland',           path: 'pl',    region: 'PL' },
+        { label: 'Portugal',         path: 'pt',    region: 'PT' },
+        { label: 'Romania',          path: 'ro',    region: 'RO' },
+        { label: 'Slovakia',         path: 'sk',    region: 'SK' },
+        { label: 'Slovenia',         path: 'si',    region: 'SI' },
+        { label: 'Sweden',           path: 'se',    region: 'SE' },
+        { label: 'Switzerland',      path: 'ch',    region: 'CH' },
+      ],
+    },
+    {
+      label: '日本語',
+      path: 'jp', region: 'JP',
+      gradient: 'linear-gradient(135deg, #f472b6, #fb7185)',
+    },
+    {
+      label: '한국어',
+      path: 'kr', region: 'KR',
+      gradient: 'linear-gradient(135deg, #818cf8, #6366f1)',
+    },
+    {
+      label: 'Deutsch',
+      path: 'de', region: 'DE',
+      gradient: 'linear-gradient(135deg, #fb923c, #f97316)',
+      sub: [
+        { label: 'Deutschland',   path: 'de', region: 'DE' },
+        { label: 'Österreich',    path: 'at', region: 'AT' },
+        { label: 'Liechtenstein', path: 'li', region: 'LI' },
+      ],
+    },
+    {
+      label: 'Français',
+      path: 'fr', region: 'FR',
+      gradient: 'linear-gradient(135deg, #38bdf8, #06b6d4)',
+      sub: [
+        { label: 'France',        path: 'fr',    region: 'FR' },
+        { label: 'Canada (FR)',   path: 'ca-fr', region: 'CA' },
+        { label: 'Luxembourg',    path: 'lu',    region: 'LU' },
+        { label: 'Monaco',        path: 'mc',    region: 'MC' },
+      ],
+    },
+    {
+      label: 'Español',
+      path: 'es', region: 'ES',
+      gradient: 'linear-gradient(135deg, #f87171, #fb923c)',
+    },
+    {
+      label: 'Italiano',
+      path: 'it', region: 'IT',
+      gradient: 'linear-gradient(135deg, #4ade80, #34d399)',
+    },
+  ];
+
+  // ── 站点配置 ─────────────────────────────────────────────
+  const host = location.hostname;
+  const isDbeta = host.includes('dbeta.me');
+  const isReactor = host.includes('www-reactor.dji.com');
+
+  // ── URL 切换函数 ──────────────────────────────────────────
+  // path=null 表示美国，URL 无语种前缀
+  function switchTo(path, region) {
+    const url = new URL(window.location.href);
+    const parts = url.pathname.split('/').filter(Boolean);
+
+    // 判断第一段是否为语种前缀
+    const knownPageSegments = (isDbeta)
+      ? ['mobile', 'edit', 'product', 'category', 'cart', 'account', 'search']
+      : isReactor
+      ? ['handheld', 'edit', 'product', 'category', 'cart', 'account', 'search']
+      : ['product', 'category', 'cart', 'account', 'search', 'combo'];
+    const hasLangPrefix = parts.length > 0 && !knownPageSegments.includes(parts[0]);
+
+    if (path === null) {
+      // 美国：去掉语种前缀
+      if (hasLangPrefix) parts.shift();
+    } else {
+      // 有前缀的地区
+      if (hasLangPrefix) {
+        parts[0] = path;
+      } else {
+        parts.unshift(path);
+      }
+    }
+
+    url.pathname = '/' + parts.join('/');
+
+    if (isDbeta || isReactor) {
+      // dbeta / reactor：只保留 workspace，不需要 set_region
+      url.searchParams.delete('set_region');
+      url.searchParams.delete('from');
+    } else {
+      // DJI Store：需要 set_region
+      url.searchParams.delete('set_region');
+      url.searchParams.delete('from');
+      url.searchParams.set('set_region', region);
+    }
+
+    window.location.href = url.toString();
+  }
+
+  // ── 设备检测与切换（仅 dbeta / reactor）─────────────────
+  function isMobileUrl() {
+    const parts = location.pathname.split('/').filter(Boolean);
+    const knownPageSegs = ['mobile', 'edit', 'handheld', 'product', 'category', 'cart', 'account', 'search'];
+    const hasLangPrefix = parts.length > 0 && !knownPageSegs.includes(parts[0]);
+    const mobileIndex = hasLangPrefix ? 1 : 0;
+    return parts[mobileIndex] === 'mobile';
+  }
+
+  function switchDevice(toMobile) {
+    const url = new URL(window.location.href);
+    const parts = url.pathname.split('/').filter(Boolean);
+    const knownPageSegs = ['mobile', 'edit', 'handheld', 'product', 'category', 'cart', 'account', 'search'];
+    const hasLangPrefix = parts.length > 0 && !knownPageSegs.includes(parts[0]);
+    const mobileIndex = hasLangPrefix ? 1 : 0;
+    const hasMobile = parts[mobileIndex] === 'mobile';
+
+    if (toMobile && !hasMobile) {
+      // 插入 mobile 到语种后面
+      parts.splice(mobileIndex, 0, 'mobile');
+    } else if (!toMobile && hasMobile) {
+      // 移除 mobile
+      parts.splice(mobileIndex, 1);
+    } else {
+      return; // 已经是目标状态，不操作
+    }
+
+    url.pathname = '/' + parts.join('/');
+    window.location.href = url.toString();
+  }
+
+  // ── 注入样式 ──────────────────────────────────────────────
+  const style = document.createElement('style');
+  style.textContent = `
+    #dji-lang-panel {
+      position: fixed;
+      top: 50%;
+      right: 0;
+      transform: translateY(-50%);
+      z-index: 999999;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 6px 8px 10px 8px;
+      background: rgba(18, 18, 28, 0.93);
+      border-radius: 14px 0 0 14px;
+      box-shadow: -4px 0 24px rgba(0,0,0,0.5);
+      backdrop-filter: blur(10px);
+      transition: transform 0.25s cubic-bezier(.4,0,.2,1);
+      user-select: none;
+      max-height: 90vh;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.2) transparent;
+    }
+
+    #dji-lang-panel.collapsed {
+      transform: translateY(-50%) translateX(calc(100% + 0px));
+    }
+
+    /* 收起/展开 tab，固定在面板左侧外部，不受 overflow 影响 */
+    #dji-lang-tab {
+      position: fixed;
+      top: 50%;
+      right: 0;
+      transform: translateY(-50%);
+      z-index: 999998;
+      width: 20px;
+      height: 56px;
+      background: rgba(18, 18, 28, 0.93);
+      border-radius: 8px 0 0 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: rgba(255,255,255,0.8);
+      box-shadow: -3px 0 10px rgba(0,0,0,0.4);
+      transition: color 0.15s, right 0.25s cubic-bezier(.4,0,.2,1);
+    }
+
+    #dji-lang-tab:hover {
+      color: #fff;
+    }
+
+    .dji-lang-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .dji-lang-btn {
+      position: relative;
+      height: 40px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      color: #1a1a1a;
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      gap: 6px;
+      transition: transform 0.15s, box-shadow 0.15s;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      white-space: nowrap;
+      flex-shrink: 0;
+      width: 128px;
+    }
+
+    .dji-lang-btn:hover {
+      transform: scale(1.04);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    }
+
+    .dji-lang-btn .dji-star {
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .dji-lang-btn .dji-label {
+      flex: 1;
+      text-align: left;
+    }
+
+    /* 语种主按钮 + 箭头按钮并排容器 */
+    .dji-lang-row {
+      display: flex;
+      gap: 4px;
+      align-items: stretch;
+    }
+
+    /* 箭头按钮：独立小块，和主按钮分开 */
+    .dji-arrow-btn {
+      position: relative;
+      flex-shrink: 0;
+      width: 32px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 10px;
+      color: #1a1a1a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    .dji-arrow-btn:hover {
+      filter: brightness(1.15);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+    }
+
+    .dji-arrow-btn.open {
+      transform: rotate(180deg);
+    }
+
+    /* Tooltip：hover 箭头时显示 */
+    .dji-arrow-btn .dji-tooltip {
+      display: none;
+      position: absolute;
+      right: 38px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(10,10,20,0.92);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 5px 9px;
+      border-radius: 7px;
+      white-space: nowrap;
+      pointer-events: none;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .dji-arrow-btn .dji-tooltip::after {
+      content: '';
+      position: absolute;
+      right: -5px;
+      top: 50%;
+      transform: translateY(-50%);
+      border: 5px solid transparent;
+      border-right: none;
+      border-left-color: rgba(10,10,20,0.92);
+    }
+
+    .dji-arrow-btn:hover .dji-tooltip {
+      display: block;
+    }
+
+    /* 下拉子菜单 */
+    .dji-sub-menu {
+      display: none;
+      flex-direction: column;
+      gap: 3px;
+      padding: 4px 0 2px 10px;
+      max-height: 300px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.15) transparent;
+    }
+
+    .dji-sub-menu.open {
+      display: flex;
+    }
+
+    .dji-sub-btn {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 7px;
+      color: #ddd;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 5px 10px;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+      width: 118px;
+    }
+
+    .dji-sub-btn:hover {
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+    }
+
+    /* PC/MB 设备切换按钮 */
+    .dji-device-row {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 4px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .dji-device-btn {
+      flex: 1;
+      height: 36px;
+      border: 2px solid transparent;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      transition: all 0.15s;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+
+    .dji-device-btn.active {
+      background: rgba(59, 130, 246, 0.9);
+      color: #fff;
+      border-color: rgba(96, 165, 250, 0.6);
+      box-shadow: 0 2px 12px rgba(59,130,246,0.4);
+    }
+
+    .dji-device-btn.inactive {
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.45);
+      border-color: rgba(255,255,255,0.1);
+    }
+
+    .dji-device-btn.inactive:hover {
+      background: rgba(255,255,255,0.15);
+      color: rgba(255,255,255,0.8);
+    }
+  `;
+  document.head.appendChild(style);
+
+  // ── 构建面板 ──────────────────────────────────────────────
+  const panel = document.createElement('div');
+  panel.id = 'dji-lang-panel';
+
+  // 独立的收起/展开 tab（脱离面板，不受 overflow 影响）
+  const tab = document.createElement('div');
+  tab.id = 'dji-lang-tab';
+  tab.title = '收起/展开语种面板';
+  tab.textContent = '◀';
+
+  let collapsed = false;
+  tab.addEventListener('click', () => {
+    collapsed = !collapsed;
+    if (collapsed) {
+      panel.style.transform = 'translateY(-50%) translateX(100%)';
+      tab.style.right = '0px';
+      tab.textContent = '▶';
+    } else {
+      panel.style.transform = 'translateY(-50%)';
+      tab.style.right = (panel.offsetWidth) + 'px';
+      tab.textContent = '◀';
+    }
+  });
+
+  // 面板展开时 tab 跟着面板左边
+  function updateTabPosition() {
+    if (!collapsed) {
+      tab.style.right = panel.offsetWidth + 'px';
+    }
+  }
+
+  // ── PC/MB 设备切换按钮（仅 dbeta / reactor）──────────────
+  if (isDbeta || isReactor) {
+    const deviceRow = document.createElement('div');
+    deviceRow.className = 'dji-device-row';
+
+    const mobile = isMobileUrl();
+
+    const pcBtn = document.createElement('button');
+    pcBtn.className = 'dji-device-btn ' + (mobile ? 'inactive' : 'active');
+    pcBtn.textContent = '🖥 PC';
+    pcBtn.title = '切换到电脑端';
+    pcBtn.addEventListener('click', () => switchDevice(false));
+
+    const mbBtn = document.createElement('button');
+    mbBtn.className = 'dji-device-btn ' + (mobile ? 'active' : 'inactive');
+    mbBtn.textContent = '📱 MB';
+    mbBtn.title = '切换到手机端';
+    mbBtn.addEventListener('click', () => switchDevice(true));
+
+    deviceRow.appendChild(pcBtn);
+    deviceRow.appendChild(mbBtn);
+    panel.appendChild(deviceRow);
+  }
+
+  // 生成语种按钮
+  LANGS.forEach((lang) => {
+    const item = document.createElement('div');
+    item.className = 'dji-lang-item';
+
+    const btn = document.createElement('button');
+    btn.className = 'dji-lang-btn';
+    btn.style.background = lang.gradient;
+
+    const star = document.createElement('span');
+    star.className = 'dji-star';
+    star.textContent = '⭐';
+
+    const label = document.createElement('span');
+    label.className = 'dji-label';
+    label.textContent = lang.label;
+
+    btn.appendChild(star);
+    btn.appendChild(label);
+
+    if (lang.sub) {
+      // ── 有子选项：主按钮直接跳默认（第一个），箭头独立控制展开 ──
+      const row = document.createElement('div');
+      row.className = 'dji-lang-row';
+
+      // 主按钮：宽度缩短给箭头让位，点击直接跳第一个国家
+      btn.style.flex = '1';
+      btn.style.width = 'auto';
+      btn.addEventListener('click', () => switchTo(lang.sub[0].path, lang.sub[0].region));
+
+      // 箭头按钮
+      const arrowBtn = document.createElement('button');
+      arrowBtn.className = 'dji-arrow-btn';
+      arrowBtn.style.background = lang.gradient;
+      arrowBtn.textContent = '▼';
+
+      // Tooltip
+      const tooltip = document.createElement('span');
+      tooltip.className = 'dji-tooltip';
+      tooltip.textContent = '展开更多国家';
+      arrowBtn.appendChild(tooltip);
+
+      const subMenu = document.createElement('div');
+      subMenu.className = 'dji-sub-menu';
+
+      lang.sub.forEach((s) => {
+        const subBtn = document.createElement('button');
+        subBtn.className = 'dji-sub-btn';
+        subBtn.textContent = s.label;
+        subBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          switchTo(s.path, s.region);
+        });
+        subMenu.appendChild(subBtn);
+      });
+
+      arrowBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = subMenu.classList.toggle('open');
+        arrowBtn.classList.toggle('open', isOpen);
+        tooltip.textContent = isOpen ? '收起' : '展开更多国家';
+      });
+
+      row.appendChild(btn);
+      row.appendChild(arrowBtn);
+      item.appendChild(row);
+      item.appendChild(subMenu);
+    } else {
+      // 无子选项 → 直接跳转
+      btn.addEventListener('click', () => switchTo(lang.path, lang.region));
+      item.appendChild(btn);
+    }
+
+    panel.appendChild(item);
+  });
+
+  document.body.appendChild(tab);
+  document.body.appendChild(panel);
+
+  // 初始化 tab 位置（等面板渲染完）
+  requestAnimationFrame(() => updateTabPosition());
+})();
