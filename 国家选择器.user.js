@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.12.1
+// @version       2.13.0
 // @description   电源规格国家选择器 + Stormsend语种Tab固定（5种页面支持）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -11,7 +11,7 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.12.1 启动');
+    console.log('Chris：国家Selector v2.13.0 启动');
 
     /**************** 累加模式（默认关闭）****************/
     let accumulateMode = false;
@@ -574,11 +574,12 @@
             #chris-btn-list.collapsed {
                 display: none;
             }
-            /* ════ 语种 Tab 固定面板 ════ */
+            /* ════ 语种 Tab 固定面板（右侧垂直居中，悬浮于所有 frame 之上）════ */
             #chris-lang-panel {
                 position: fixed;
                 right: 14px;
-                bottom: 20px;
+                top: 50%;
+                transform: translateY(-50%);
                 z-index: 2147483646;
                 display: flex;
                 flex-direction: column;
@@ -835,120 +836,159 @@
 
     /***********************************************
      * 语种 Tab 固定面板（Stormsend 编辑页）
-     * 把 .form-lang-group-outer 的 li 列表克隆到右下角固定面板
-     * 点击克隆按钮触发原 li 的 click 事件
+     * 仅在主 frame 中创建固定面板，但能控制主 frame + 所有同源 iframe 内的 form
      ***********************************************/
     let langPanel = null;
 
     /**
-     * 切换语种 —— 复制原页面 jQuery handler 的核心逻辑：
-     * 找到目标 li 所在的 form，把 form 的 class 从旧 locale 切换到新 locale
-     * 同时尝试 jQuery trigger 触发原 handler 作为辅助
+     * 收集所有同源 document（主 frame + 所有同源 iframe）
      */
-    function switchLocale(locale) {
-        const targetLi = document.querySelector(`li.form-lang[data-locale="${locale}"]`);
-        if (!targetLi) {
-            console.warn('Chris [Lang]：找不到目标 li', locale);
-            return;
-        }
-
-        // 优先尝试 jQuery trigger（让原 handler 自然执行）
-        if (typeof jQuery !== 'undefined') {
+    function getAllSameOriginDocs() {
+        const docs = [document];
+        document.querySelectorAll('iframe').forEach(iframe => {
             try {
-                jQuery(targetLi).trigger('click');
-            } catch (err) {
-                console.warn('jQuery trigger 失败:', err);
+                const idoc = iframe.contentDocument || iframe.contentWindow?.document;
+                if (idoc) docs.push(idoc);
+            } catch (e) {
+                // 跨域 iframe 会抛错，忽略
             }
-        }
-
-        // 兜底：手动复制原 handler 的逻辑
-        // 原逻辑：t.parents("form") → removeClass(form的旧locale) → addClass(新locale) → data-locale=新locale
-        const $li = typeof jQuery !== 'undefined' ? jQuery(targetLi) : null;
-        if ($li) {
-            const $forms = $li.parents('form');
-            $forms.each(function() {
-                const $form = jQuery(this);
-                const oldLocale = $form.data('locale');
-                if (oldLocale) $form.removeClass(oldLocale);
-                $form.addClass(locale).data('locale', locale);
-            });
-        } else {
-            // 没有 jQuery 时降级：原生 DOM 操作
-            let parent = targetLi.parentElement;
-            while (parent) {
-                if (parent.tagName === 'FORM') {
-                    const oldLocale = parent.dataset.locale || parent.getAttribute('data-locale');
-                    if (oldLocale) parent.classList.remove(oldLocale);
-                    parent.classList.add(locale);
-                    parent.dataset.locale = locale;
-                }
-                parent = parent.parentElement;
-            }
-        }
-
-        console.log(`Chris [Lang]：已切换到 ${locale}`);
+        });
+        return docs;
     }
 
-    function getActiveLocale() {
-        const allLi = document.querySelectorAll('li.form-lang');
-        if (!allLi.length) return null;
+    /**
+     * 是否任意 document（主 frame 或同源 iframe）有 .form-lang-group-outer
+     */
+    function hasLangGroupAnywhere() {
+        return getAllSameOriginDocs().some(doc =>
+            doc.querySelector('.form-lang-group-outer') !== null
+        );
+    }
 
-        // 方法0（最准确）：从 form 的 data-locale 取
-        const $li = typeof jQuery !== 'undefined' ? jQuery(allLi[0]) : null;
-        if ($li) {
-            const $form = $li.parents('form').first();
-            const formLocale = $form.data('locale') || $form.attr('data-locale');
-            if (formLocale) return formLocale;
-        } else {
-            let parent = allLi[0].parentElement;
+    /**
+     * 在指定 document 内切换 form 的 locale（复制原 jQuery handler 的逻辑）
+     */
+    function switchLocaleInDoc(doc, locale) {
+        // 找到该 document 内目标 li 所在的所有 form，更新 class
+        const targetLis = doc.querySelectorAll(`li.form-lang[data-locale="${locale}"]`);
+        if (!targetLis.length) return false;
+
+        let switched = false;
+        targetLis.forEach(li => {
+            // 优先用主窗口的 jQuery（如果有）触发委托事件
+            const win = doc.defaultView;
+            const $ = win?.jQuery || window.jQuery;
+            if ($) {
+                try {
+                    $(li).trigger('click');
+                    switched = true;
+                } catch (e) {}
+            }
+
+            // 兜底：手动执行原 handler 逻辑
+            // 原逻辑：t.parents("form") → removeClass(form的旧locale) → addClass(新locale) → data-locale=新locale
+            let parent = li.parentElement;
             while (parent) {
                 if (parent.tagName === 'FORM') {
-                    const fl = parent.dataset.locale || parent.getAttribute('data-locale');
-                    if (fl) return fl;
-                    break;
+                    if ($) {
+                        const $form = $(parent);
+                        const oldLocale = $form.data('locale');
+                        if (oldLocale) $form.removeClass(oldLocale);
+                        $form.addClass(locale).data('locale', locale);
+                    } else {
+                        const oldLocale = parent.dataset.locale || parent.getAttribute('data-locale');
+                        if (oldLocale) parent.classList.remove(oldLocale);
+                        parent.classList.add(locale);
+                        parent.dataset.locale = locale;
+                    }
+                    switched = true;
                 }
                 parent = parent.parentElement;
             }
-        }
+        });
+        return switched;
+    }
 
-        // 方法1：检查 class 中是否有 active/current/selected 等关键词
-        for (const li of allLi) {
-            const cls = li.className.toLowerCase();
-            if (cls.includes('active') || cls.includes('current') || cls.includes('selected') || cls.includes('checked')) {
-                return li.dataset.locale;
+    /**
+     * 切换语种 —— 跨所有同源 frame 同时切换
+     */
+    function switchLocale(locale) {
+        const docs = getAllSameOriginDocs();
+        let count = 0;
+        docs.forEach(doc => {
+            if (switchLocaleInDoc(doc, locale)) count++;
+        });
+        console.log(`Chris [Lang]：已切换到 ${locale}，影响 ${count}/${docs.length} 个 frame`);
+    }
+
+    function getActiveLocaleFromDoc(doc) {
+        const allLi = doc.querySelectorAll('li.form-lang');
+        if (!allLi.length) return null;
+
+        const win = doc.defaultView;
+        const $ = win?.jQuery || window.jQuery;
+
+        // 方法0（最准确）：从 form 的 data-locale 取（jQuery $.data 优先）
+        if ($) {
+            const $form = $(allLi[0]).parents('form').first();
+            const formLocale = $form.data('locale') || $form.attr('data-locale');
+            if (formLocale) return formLocale;
+        }
+        let parent = allLi[0].parentElement;
+        while (parent) {
+            if (parent.tagName === 'FORM') {
+                // 优先从 class 列表里找 locale（form 的 class 会被原 handler 加上 locale）
+                const classes = parent.className.split(/\s+/);
+                const allLocales = [...allLi].map(li => li.dataset.locale);
+                for (const cls of classes) {
+                    if (allLocales.includes(cls)) return cls;
+                }
+                const fl = parent.dataset.locale || parent.getAttribute('data-locale');
+                if (fl) return fl;
+                break;
             }
+            parent = parent.parentElement;
         }
 
-        // 方法2：比对 background-color 找出与众不同的那个
+        // 方法2：比对 background-color
         const bgCount = {};
         allLi.forEach(li => {
-            const bg = getComputedStyle(li).backgroundColor;
+            const bg = win.getComputedStyle(li).backgroundColor;
             bgCount[bg] = (bgCount[bg] || 0) + 1;
         });
         const minBg = Object.entries(bgCount).sort((a, b) => a[1] - b[1])[0]?.[0];
         if (minBg && bgCount[minBg] === 1) {
             for (const li of allLi) {
-                if (getComputedStyle(li).backgroundColor === minBg) {
-                    return li.dataset.locale;
-                }
+                if (win.getComputedStyle(li).backgroundColor === minBg) return li.dataset.locale;
             }
         }
 
         // 方法3：比对 color
         const colorCount = {};
         allLi.forEach(li => {
-            const c = getComputedStyle(li).color;
+            const c = win.getComputedStyle(li).color;
             colorCount[c] = (colorCount[c] || 0) + 1;
         });
         const minColor = Object.entries(colorCount).sort((a, b) => a[1] - b[1])[0]?.[0];
         if (minColor && colorCount[minColor] === 1) {
             for (const li of allLi) {
-                if (getComputedStyle(li).color === minColor) {
-                    return li.dataset.locale;
-                }
+                if (win.getComputedStyle(li).color === minColor) return li.dataset.locale;
             }
         }
 
+        return null;
+    }
+
+    /**
+     * 跨所有 frame 找当前选中的 locale —— 优先取 iframe 内的（用户实际操作的 form）
+     */
+    function getActiveLocale() {
+        const docs = getAllSameOriginDocs();
+        // 优先 iframe 内（docs[1+]）
+        for (let i = docs.length - 1; i >= 0; i--) {
+            const locale = getActiveLocaleFromDoc(docs[i]);
+            if (locale) return locale;
+        }
         return null;
     }
 
@@ -968,8 +1008,18 @@
         if (document.getElementById('chris-lang-panel')) return;
         injectStyles();
 
-        const allLi = document.querySelectorAll('li.form-lang');
-        if (!allLi.length) return;
+        // 从所有同源 frame 收集 li 列表，按 data-locale 去重
+        const docs = getAllSameOriginDocs();
+        const liByLocale = new Map();
+        docs.forEach(doc => {
+            doc.querySelectorAll('li.form-lang').forEach(li => {
+                const locale = li.dataset.locale;
+                if (locale && !liByLocale.has(locale)) {
+                    liByLocale.set(locale, li);
+                }
+            });
+        });
+        if (liByLocale.size === 0) return;
 
         langPanel = document.createElement('div');
         langPanel.id = 'chris-lang-panel';
@@ -997,9 +1047,8 @@
             }
         };
 
-        // 克隆每个 li 为按钮
-        allLi.forEach(originalLi => {
-            const locale = originalLi.dataset.locale;
+        // 克隆每个 locale 为按钮（去重，跨 frame 统一）
+        liByLocale.forEach((originalLi, locale) => {
             const btn = document.createElement('button');
             btn.className = 'chris-lang-btn';
             btn.dataset.locale = locale;
@@ -1020,22 +1069,33 @@
         // 初次同步
         setTimeout(syncLangActiveState, 200);
 
-        // 监听原 ul 的变化（class、style 变化时同步）
-        const ul = document.querySelector('ul.form-lang-group');
-        if (ul) {
-            const observer = new MutationObserver(syncLangActiveState);
-            observer.observe(ul, {
-                attributes: true,
-                attributeFilter: ['class', 'style'],
-                childList: true,
-                subtree: true
+        // 监听所有 frame 内 ul.form-lang-group 的变化
+        docs.forEach(doc => {
+            const ul = doc.querySelector('ul.form-lang-group');
+            if (ul) {
+                try {
+                    const observer = new MutationObserver(syncLangActiveState);
+                    observer.observe(ul, {
+                        attributes: true,
+                        attributeFilter: ['class', 'style'],
+                        childList: true,
+                        subtree: true
+                    });
+                } catch (e) {}
+            }
+            // 也监听该 doc 下所有 form 的 class 变化
+            doc.querySelectorAll('form').forEach(form => {
+                try {
+                    const obs = new MutationObserver(syncLangActiveState);
+                    obs.observe(form, { attributes: true, attributeFilter: ['class'] });
+                } catch (e) {}
             });
-        }
+        });
 
-        // 兜底：每 1 秒轮询一次（防止 MutationObserver 漏掉变化）
+        // 兜底：每 1 秒轮询一次
         setInterval(syncLangActiveState, 1000);
 
-        console.log('Chris：语种 Tab 固定面板已注入');
+        console.log(`Chris：语种 Tab 固定面板已注入（覆盖 ${docs.length} 个 frame，${liByLocale.size} 个语种）`);
     }
 
     /***********************************************
@@ -1072,8 +1132,9 @@
         }
 
         // 语种 Tab 固定面板（独立于国家选择器）
-        // 检测条件：页面有 .form-lang-group-outer 元素
-        if (document.querySelector('.form-lang-group-outer')) {
+        // 仅在主 frame 中创建，避免 iframe 内重复注入导致面板不同步
+        // 检测条件：(1) 是主 frame  (2) 主 frame 或任意同源 iframe 内有 .form-lang-group-outer
+        if (window === window.top && hasLangGroupAnywhere()) {
             injectLangTab();
         }
     }
