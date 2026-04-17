@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.11.1
-// @description   电源规格国家选择器（支持 mkt弹窗 + mkt表单 + stormsend + sales_ban 四种页面）
+// @version       2.12.0
+// @description   电源规格国家选择器 + Stormsend语种Tab固定（5种页面支持）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
 // @grant         none
@@ -11,7 +11,7 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.11.0 启动');
+    console.log('Chris：国家Selector v2.12.0 启动');
 
     /**************** 累加模式（默认关闭）****************/
     let accumulateMode = false;
@@ -574,6 +574,88 @@
             #chris-btn-list.collapsed {
                 display: none;
             }
+            /* ════ 语种 Tab 固定面板 ════ */
+            #chris-lang-panel {
+                position: fixed;
+                right: 14px;
+                bottom: 20px;
+                z-index: 2147483646;
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+                pointer-events: none;
+                font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+            }
+            #chris-lang-toggle {
+                width: 26px;
+                height: 26px;
+                border-radius: 50%;
+                border: none;
+                background: rgba(255,255,255,0.92);
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 12px;
+                transition: transform 0.2s ease, background 0.2s ease;
+                pointer-events: auto;
+                margin-bottom: 4px;
+            }
+            #chris-lang-toggle:hover { background: #fff; transform: scale(1.1); }
+            #chris-lang-list {
+                display: flex;
+                flex-direction: column;
+                gap: 3px;
+            }
+            #chris-lang-list.collapsed { display: none; }
+            .chris-lang-btn {
+                position: relative;
+                width: 100px;
+                height: 30px;
+                border-radius: 8px;
+                border: none;
+                background: linear-gradient(160deg, rgba(255,255,255,0.95) 0%, rgba(230,230,230,0.95) 100%);
+                color: #555;
+                font-size: 13px;
+                font-weight: 700;
+                font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+                letter-spacing: 0.5px;
+                cursor: pointer;
+                box-shadow: 0 3px 10px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.6);
+                transition: transform 0.15s cubic-bezier(.34,1.56,.64,1), box-shadow 0.15s ease, filter 0.15s ease;
+                pointer-events: auto;
+                white-space: nowrap;
+                padding: 0 8px;
+                text-align: center;
+                outline: none;
+                overflow: hidden;
+            }
+            .chris-lang-btn::before {
+                content: '';
+                position: absolute;
+                top: 0; left: 0; right: 0;
+                height: 50%;
+                background: linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 100%);
+                border-radius: 8px 8px 0 0;
+                pointer-events: none;
+            }
+            .chris-lang-btn:hover {
+                transform: scale(1.06) translateX(-3px);
+                box-shadow: 0 5px 14px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.7);
+                filter: brightness(1.05);
+            }
+            .chris-lang-btn.active {
+                background: linear-gradient(160deg, #4fc3f7 0%, #1976d2 50%, #0d47a1 100%);
+                color: #fff;
+                font-weight: 800;
+                text-shadow: 0 1px 3px rgba(0,0,0,0.35);
+                box-shadow: 0 4px 14px rgba(25,118,210,0.6), inset 0 1px 0 rgba(255,255,255,0.3);
+                transform: scale(1.05);
+            }
+            .chris-lang-btn.active::before {
+                background: linear-gradient(180deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0) 100%);
+            }
         `;
         document.head.appendChild(style);
     }
@@ -752,6 +834,146 @@
     }
 
     /***********************************************
+     * 语种 Tab 固定面板（Stormsend 编辑页）
+     * 把 .form-lang-group-outer 的 li 列表克隆到右下角固定面板
+     * 点击克隆按钮触发原 li 的 click 事件
+     ***********************************************/
+    let langPanel = null;
+
+    function getActiveLocale() {
+        const allLi = document.querySelectorAll('li.form-lang');
+        if (!allLi.length) return null;
+
+        // 方法1：检查 class 中是否有 active/current/selected 等关键词
+        for (const li of allLi) {
+            const cls = li.className.toLowerCase();
+            if (cls.includes('active') || cls.includes('current') || cls.includes('selected') || cls.includes('checked')) {
+                return li.dataset.locale;
+            }
+        }
+
+        // 方法2：比对 background-color 找出与众不同的那个
+        const bgCount = {};
+        allLi.forEach(li => {
+            const bg = getComputedStyle(li).backgroundColor;
+            bgCount[bg] = (bgCount[bg] || 0) + 1;
+        });
+        const minBg = Object.entries(bgCount).sort((a, b) => a[1] - b[1])[0]?.[0];
+        if (minBg && bgCount[minBg] === 1) {
+            for (const li of allLi) {
+                if (getComputedStyle(li).backgroundColor === minBg) {
+                    return li.dataset.locale;
+                }
+            }
+        }
+
+        // 方法3：比对 color
+        const colorCount = {};
+        allLi.forEach(li => {
+            const c = getComputedStyle(li).color;
+            colorCount[c] = (colorCount[c] || 0) + 1;
+        });
+        const minColor = Object.entries(colorCount).sort((a, b) => a[1] - b[1])[0]?.[0];
+        if (minColor && colorCount[minColor] === 1) {
+            for (const li of allLi) {
+                if (getComputedStyle(li).color === minColor) {
+                    return li.dataset.locale;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    function syncLangActiveState() {
+        if (!langPanel) return;
+        const activeLocale = getActiveLocale();
+        langPanel.querySelectorAll('.chris-lang-btn').forEach(btn => {
+            if (btn.dataset.locale === activeLocale) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+
+    function injectLangTab() {
+        if (document.getElementById('chris-lang-panel')) return;
+        injectStyles();
+
+        const allLi = document.querySelectorAll('li.form-lang');
+        if (!allLi.length) return;
+
+        langPanel = document.createElement('div');
+        langPanel.id = 'chris-lang-panel';
+
+        // 收起/展开箭头
+        const toggleBtn = document.createElement('button');
+        toggleBtn.id = 'chris-lang-toggle';
+        toggleBtn.textContent = '›';
+        toggleBtn.title = '展开/收起语种Tab';
+        toggleBtn.style.transform = 'rotate(180deg)';
+
+        const list = document.createElement('div');
+        list.id = 'chris-lang-list';
+        let expanded = true;
+        toggleBtn.onclick = e => {
+            e.stopPropagation();
+            e.preventDefault();
+            expanded = !expanded;
+            if (expanded) {
+                list.classList.remove('collapsed');
+                toggleBtn.style.transform = 'rotate(180deg)';
+            } else {
+                list.classList.add('collapsed');
+                toggleBtn.style.transform = 'rotate(0deg)';
+            }
+        };
+
+        // 克隆每个 li 为按钮
+        allLi.forEach(originalLi => {
+            const locale = originalLi.dataset.locale;
+            const btn = document.createElement('button');
+            btn.className = 'chris-lang-btn';
+            btn.dataset.locale = locale;
+            btn.textContent = originalLi.textContent.trim();
+            btn.onclick = e => {
+                e.stopPropagation();
+                e.preventDefault();
+                const orig = document.querySelector(`li.form-lang[data-locale="${locale}"]`);
+                if (orig) orig.click();
+                // 立即同步一次（虽然 MutationObserver 也会触发，但立即同步更快）
+                setTimeout(syncLangActiveState, 100);
+            };
+            list.appendChild(btn);
+        });
+
+        langPanel.appendChild(toggleBtn);
+        langPanel.appendChild(list);
+        document.body.appendChild(langPanel);
+
+        // 初次同步
+        setTimeout(syncLangActiveState, 200);
+
+        // 监听原 ul 的变化（class、style 变化时同步）
+        const ul = document.querySelector('ul.form-lang-group');
+        if (ul) {
+            const observer = new MutationObserver(syncLangActiveState);
+            observer.observe(ul, {
+                attributes: true,
+                attributeFilter: ['class', 'style'],
+                childList: true,
+                subtree: true
+            });
+        }
+
+        // 兜底：每 1 秒轮询一次（防止 MutationObserver 漏掉变化）
+        setInterval(syncLangActiveState, 1000);
+
+        console.log('Chris：语种 Tab 固定面板已注入');
+    }
+
+    /***********************************************
      * 初始化
      ***********************************************/
     function init() {
@@ -782,6 +1004,12 @@
 
             // 如果 modal 已经打开
             if (getVisibleModal()) showPanel();
+        }
+
+        // 语种 Tab 固定面板（独立于国家选择器）
+        // 检测条件：页面有 .form-lang-group-outer 元素
+        if (document.querySelector('.form-lang-group-outer')) {
+            injectLangTab();
         }
     }
 
