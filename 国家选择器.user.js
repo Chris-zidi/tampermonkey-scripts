@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.12.0
+// @version       2.12.1
 // @description   电源规格国家选择器 + Stormsend语种Tab固定（5种页面支持）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -11,7 +11,7 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.12.0 启动');
+    console.log('Chris：国家Selector v2.12.1 启动');
 
     /**************** 累加模式（默认关闭）****************/
     let accumulateMode = false;
@@ -840,9 +840,76 @@
      ***********************************************/
     let langPanel = null;
 
+    /**
+     * 切换语种 —— 复制原页面 jQuery handler 的核心逻辑：
+     * 找到目标 li 所在的 form，把 form 的 class 从旧 locale 切换到新 locale
+     * 同时尝试 jQuery trigger 触发原 handler 作为辅助
+     */
+    function switchLocale(locale) {
+        const targetLi = document.querySelector(`li.form-lang[data-locale="${locale}"]`);
+        if (!targetLi) {
+            console.warn('Chris [Lang]：找不到目标 li', locale);
+            return;
+        }
+
+        // 优先尝试 jQuery trigger（让原 handler 自然执行）
+        if (typeof jQuery !== 'undefined') {
+            try {
+                jQuery(targetLi).trigger('click');
+            } catch (err) {
+                console.warn('jQuery trigger 失败:', err);
+            }
+        }
+
+        // 兜底：手动复制原 handler 的逻辑
+        // 原逻辑：t.parents("form") → removeClass(form的旧locale) → addClass(新locale) → data-locale=新locale
+        const $li = typeof jQuery !== 'undefined' ? jQuery(targetLi) : null;
+        if ($li) {
+            const $forms = $li.parents('form');
+            $forms.each(function() {
+                const $form = jQuery(this);
+                const oldLocale = $form.data('locale');
+                if (oldLocale) $form.removeClass(oldLocale);
+                $form.addClass(locale).data('locale', locale);
+            });
+        } else {
+            // 没有 jQuery 时降级：原生 DOM 操作
+            let parent = targetLi.parentElement;
+            while (parent) {
+                if (parent.tagName === 'FORM') {
+                    const oldLocale = parent.dataset.locale || parent.getAttribute('data-locale');
+                    if (oldLocale) parent.classList.remove(oldLocale);
+                    parent.classList.add(locale);
+                    parent.dataset.locale = locale;
+                }
+                parent = parent.parentElement;
+            }
+        }
+
+        console.log(`Chris [Lang]：已切换到 ${locale}`);
+    }
+
     function getActiveLocale() {
         const allLi = document.querySelectorAll('li.form-lang');
         if (!allLi.length) return null;
+
+        // 方法0（最准确）：从 form 的 data-locale 取
+        const $li = typeof jQuery !== 'undefined' ? jQuery(allLi[0]) : null;
+        if ($li) {
+            const $form = $li.parents('form').first();
+            const formLocale = $form.data('locale') || $form.attr('data-locale');
+            if (formLocale) return formLocale;
+        } else {
+            let parent = allLi[0].parentElement;
+            while (parent) {
+                if (parent.tagName === 'FORM') {
+                    const fl = parent.dataset.locale || parent.getAttribute('data-locale');
+                    if (fl) return fl;
+                    break;
+                }
+                parent = parent.parentElement;
+            }
+        }
 
         // 方法1：检查 class 中是否有 active/current/selected 等关键词
         for (const li of allLi) {
@@ -940,9 +1007,7 @@
             btn.onclick = e => {
                 e.stopPropagation();
                 e.preventDefault();
-                const orig = document.querySelector(`li.form-lang[data-locale="${locale}"]`);
-                if (orig) orig.click();
-                // 立即同步一次（虽然 MutationObserver 也会触发，但立即同步更快）
+                switchLocale(locale);
                 setTimeout(syncLangActiveState, 100);
             };
             list.appendChild(btn);
