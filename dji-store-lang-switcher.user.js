@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DJI 语种快速切换2
 // @namespace    https://store.dji.com/
-// @version      4.8.2
+// @version      4.9.0
 // @description  在 DJI 商城及后台编辑页右侧注入语种快捷切换按钮面板，MKT 后台弹窗语种快选，产品页 SKU 快速切换，左侧模块导航面板
 // @author       o-park.chen
 // @match        https://store.dji.com/*
@@ -1371,9 +1371,13 @@
         btn.appendChild(index);
         btn.appendChild(label);
 
-        // 点击跳转（带标记防止被 scroll 劫持）
+        // 点击跳转：实时查找目标元素（不依赖缓存引用，因为 hydration 会替换 DOM 节点）
         btn.addEventListener('click', () => {
-          mod.el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          const freshEl = document.querySelector(mod.selector) ||
+                          (mod.fallback ? document.querySelector(mod.fallback) : null);
+          if (freshEl) {
+            freshEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
         });
 
         modPanel.appendChild(btn);
@@ -1385,50 +1389,41 @@
 
     // ── IntersectionObserver 滚动高亮 ────────────────────
     function setupScrollHighlight() {
-      // 清理旧 observer
+      // 清理旧轮询
       if (modObserver) {
-        modObserver.disconnect();
+        clearInterval(modObserver);
         modObserver = null;
       }
       if (modButtons.length === 0) return;
 
-      // 用 Map 记录各模块的可见比例
-      const visibleMap = new Map();
-
-      modObserver = new IntersectionObserver((entries) => {
-        entries.forEach((entry) => {
-          visibleMap.set(entry.target, entry.intersectionRatio);
-        });
-
-        // 找到当前视口中最靠近顶部的可见模块
+      // 用轮询代替 IntersectionObserver（因为 hydration 会替换 DOM 节点，导致 observer 失效）
+      // 每 500ms 检查各模块元素相对视口的位置
+      modObserver = setInterval(() => {
         let bestBtn = null;
         let bestTop = Infinity;
         let bestSelector = null;
 
-        modButtons.forEach(({ btn, el, selector, fallback }) => {
-          const ratio = visibleMap.get(el) || 0;
-          if (ratio > 0) {
-            const rect = el.getBoundingClientRect();
-            // 优先选最靠近视口顶部的
-            if (Math.abs(rect.top) < bestTop) {
-              bestTop = Math.abs(rect.top);
-              bestBtn = btn;
-              bestSelector = selector || fallback;
-            }
+        modButtons.forEach(({ btn, selector, fallback }) => {
+          // 实时查找元素
+          const el = document.querySelector(selector) ||
+                     (fallback ? document.querySelector(fallback) : null);
+          if (!el) return;
+
+          const rect = el.getBoundingClientRect();
+          // 元素至少部分可见（顶部在视口下方 -200px 到视口底部之间）
+          const isVisible = rect.top < window.innerHeight && rect.bottom > 0;
+          if (isVisible && Math.abs(rect.top) < bestTop) {
+            bestTop = Math.abs(rect.top);
+            bestBtn = btn;
+            bestSelector = selector || fallback;
           }
         });
 
         // 更新高亮
         modButtons.forEach(({ btn }) => btn.classList.remove('active'));
         if (bestBtn) bestBtn.classList.add('active');
-        // 同步到顶层变量，供 switchTo 读取
         _currentModSelector = bestSelector;
-      }, {
-        threshold: [0, 0.1, 0.25, 0.5],
-        rootMargin: '0px 0px -30% 0px',
-      });
-
-      modButtons.forEach(({ el }) => modObserver.observe(el));
+      }, 500);
     }
 
     // ── SKU 切换后刷新模块检测 ───────────────────────────
