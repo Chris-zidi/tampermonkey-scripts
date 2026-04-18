@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         DJI 语种快速切换2
 // @namespace    https://store.dji.com/
-// @version      4.1.0
-// @description  在 DJI 商城及后台编辑页右侧注入语种快捷切换按钮面板
+// @version      4.2.0
+// @description  在 DJI 商城及后台编辑页右侧注入语种快捷切换按钮面板 + 产品页 SKU 快速切换浮动面板
 // @author       o-park.chen
 // @match        https://store.dji.com/*
 // @match        https://stag-www-reactor.dbeta.me/*
@@ -574,4 +574,356 @@
 
   // 初始化 tab 位置（等面板渲染完）
   requestAnimationFrame(() => updateTabPosition());
+
+  // ══════════════════════════════════════════════════════════
+  // ██ SKU 快速切换浮动面板（仅产品页）
+  // ══════════════════════════════════════════════════════════
+
+  const isProductPage = /\/product\//.test(location.pathname);
+  if (isProductPage) {
+    console.log('[DJI SKU Switcher] 产品页检测到，启动 SKU 面板');
+
+    // ── SKU 面板样式 ──────────────────────────────────────
+    const skuStyle = document.createElement('style');
+    skuStyle.textContent = `
+      #dji-sku-panel {
+        position: fixed;
+        top: 80px;
+        right: 0;
+        z-index: 999999;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 8px 8px 10px 8px;
+        background: rgba(18, 18, 28, 0.93);
+        border-radius: 14px 0 0 14px;
+        box-shadow: -4px 0 24px rgba(0,0,0,0.5);
+        backdrop-filter: blur(10px);
+        transition: transform 0.25s cubic-bezier(.4,0,.2,1);
+        user-select: none;
+        max-height: 50vh;
+        overflow-y: auto;
+        overflow-x: hidden;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255,255,255,0.2) transparent;
+      }
+
+      #dji-sku-panel.collapsed {
+        transform: translateX(calc(100% + 0px));
+      }
+
+      #dji-sku-tab {
+        position: fixed;
+        top: 80px;
+        right: 0;
+        z-index: 999998;
+        width: 20px;
+        height: 48px;
+        background: rgba(18, 18, 28, 0.93);
+        border-radius: 8px 0 0 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        color: rgba(255,255,255,0.8);
+        box-shadow: -3px 0 10px rgba(0,0,0,0.4);
+        transition: color 0.15s, right 0.25s cubic-bezier(.4,0,.2,1);
+      }
+
+      #dji-sku-tab:hover {
+        color: #fff;
+      }
+
+      #dji-sku-panel .sku-title {
+        font-size: 10px;
+        font-weight: 700;
+        color: rgba(255,255,255,0.5);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        padding: 0 4px 4px 4px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        margin-bottom: 2px;
+        white-space: nowrap;
+      }
+
+      .dji-sku-btn {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        width: 180px;
+        min-height: 34px;
+        padding: 5px 10px;
+        border: 2px solid transparent;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        color: rgba(255,255,255,0.8);
+        background: rgba(255,255,255,0.06);
+        transition: all 0.15s;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+        text-align: left;
+        line-height: 1.3;
+      }
+
+      .dji-sku-btn:hover {
+        background: rgba(255,255,255,0.15);
+        color: #fff;
+        transform: scale(1.02);
+      }
+
+      .dji-sku-btn.active {
+        border-color: rgba(0, 96, 239, 0.9);
+        background: rgba(0, 96, 239, 0.2);
+        color: #fff;
+        box-shadow: 0 2px 10px rgba(0,96,239,0.3);
+      }
+
+      .dji-sku-btn.out-of-stock {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .dji-sku-btn .sku-index {
+        flex-shrink: 0;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.12);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 700;
+        color: rgba(255,255,255,0.6);
+      }
+
+      .dji-sku-btn.active .sku-index {
+        background: rgba(0, 96, 239, 0.6);
+        color: #fff;
+      }
+
+      .dji-sku-btn .sku-name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+      }
+
+      .dji-sku-btn .sku-oos-tag {
+        font-size: 9px;
+        color: #f87171;
+        font-weight: 700;
+        flex-shrink: 0;
+      }
+    `;
+    document.head.appendChild(skuStyle);
+
+    // ── SKU 面板构建 ─────────────────────────────────────
+    const skuPanel = document.createElement('div');
+    skuPanel.id = 'dji-sku-panel';
+
+    const skuTab = document.createElement('div');
+    skuTab.id = 'dji-sku-tab';
+    skuTab.title = '收起/展开 SKU 面板';
+    skuTab.textContent = '◀';
+
+    let skuCollapsed = false;
+    skuTab.addEventListener('click', () => {
+      skuCollapsed = !skuCollapsed;
+      if (skuCollapsed) {
+        skuPanel.style.transform = 'translateX(100%)';
+        skuTab.style.right = '0px';
+        skuTab.textContent = '▶';
+      } else {
+        skuPanel.style.transform = '';
+        skuTab.style.right = skuPanel.offsetWidth + 'px';
+        skuTab.textContent = '◀';
+      }
+    });
+
+    function updateSkuTabPosition() {
+      if (!skuCollapsed) {
+        skuTab.style.right = skuPanel.offsetWidth + 'px';
+      }
+    }
+
+    // ── 提取 SKU 公共前缀（用于缩短显示名称）────────────
+    function findCommonPrefix(names) {
+      if (names.length <= 1) return '';
+      // 按空格分词，找公共前缀词
+      const wordArrays = names.map(n => n.trim().split(/\s+/));
+      const minLen = Math.min(...wordArrays.map(w => w.length));
+      let commonCount = 0;
+      for (let i = 0; i < minLen; i++) {
+        const word = wordArrays[0][i];
+        if (wordArrays.every(w => w[i] === word)) {
+          commonCount = i + 1;
+        } else {
+          break;
+        }
+      }
+      // 至少保留最后一个词不同的部分，但如果公共前缀占比太低就不截
+      if (commonCount === 0) return '';
+      return wordArrays[0].slice(0, commonCount).join(' ');
+    }
+
+    // ── 判断 SKU 是否被选中（通过 border 颜色）──────────
+    function isSkuSelected(li) {
+      const wrapper = li.querySelector('div[class*="new-combo-wrapper___"]');
+      if (!wrapper) return false;
+      return getComputedStyle(wrapper).borderColor.includes('0, 96, 239');
+    }
+
+    // ── 判断 SKU 是否缺货 ────────────────────────────────
+    function isSkuOutOfStock(li) {
+      const wrapper = li.querySelector('div[class*="new-combo-wrapper___"]');
+      if (!wrapper) return false;
+      return wrapper.className.includes('out-of-stock');
+    }
+
+    // ── 渲染 SKU 面板按钮 ────────────────────────────────
+    let skuButtons = []; // { btn, li } 映射
+
+    function renderSkuPanel(skuItems) {
+      skuPanel.innerHTML = '';
+      skuButtons = [];
+
+      // 标题
+      const title = document.createElement('div');
+      title.className = 'sku-title';
+      title.textContent = 'SKU 切换';
+      skuPanel.appendChild(title);
+
+      // 提取名称
+      const names = skuItems.map(li => {
+        const el = li.querySelector('div[class*="product-title"]');
+        return el ? el.textContent.trim() : '未知';
+      });
+
+      // 找公共前缀用于缩短显示
+      const prefix = findCommonPrefix(names);
+
+      skuItems.forEach((li, i) => {
+        const fullName = names[i];
+        // 去掉公共前缀，如果去掉后为空则保留完整名称
+        let shortName = prefix ? fullName.substring(prefix.length).trim() : fullName;
+        if (!shortName) shortName = fullName;
+
+        const selected = isSkuSelected(li);
+        const oos = isSkuOutOfStock(li);
+
+        const btn = document.createElement('button');
+        btn.className = 'dji-sku-btn' + (selected ? ' active' : '') + (oos ? ' out-of-stock' : '');
+        btn.title = fullName;
+
+        const index = document.createElement('span');
+        index.className = 'sku-index';
+        index.textContent = String(i + 1);
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'sku-name';
+        nameSpan.textContent = shortName;
+
+        btn.appendChild(index);
+        btn.appendChild(nameSpan);
+
+        if (oos) {
+          const oosTag = document.createElement('span');
+          oosTag.className = 'sku-oos-tag';
+          oosTag.textContent = '缺货';
+          btn.appendChild(oosTag);
+        }
+
+        btn.addEventListener('click', () => {
+          if (oos) return;
+          const input = li.querySelector('input[type="radio"]');
+          if (input) input.click();
+        });
+
+        skuPanel.appendChild(btn);
+        skuButtons.push({ btn, li });
+      });
+    }
+
+    // ── 更新选中态 ───────────────────────────────────────
+    function updateSkuActiveState() {
+      skuButtons.forEach(({ btn, li }) => {
+        const selected = isSkuSelected(li);
+        btn.classList.toggle('active', selected);
+        const idx = btn.querySelector('.sku-index');
+        if (idx) {
+          // active class 已通过 CSS 处理
+        }
+      });
+    }
+
+    // ── 等待 SKU 区域出现并初始化 ─────────────────────────
+    let skuInitAttempts = 0;
+    const skuMaxAttempts = 20; // 最多等 10 秒（500ms x 20）
+
+    function tryInitSkuPanel() {
+      skuInitAttempts++;
+      const section = document.querySelector('section[data-test-locator="sectionProductComboPools"]');
+      if (!section) {
+        if (skuInitAttempts < skuMaxAttempts) {
+          setTimeout(tryInitSkuPanel, 500);
+        } else {
+          console.log('[DJI SKU Switcher] 未找到 SKU 区域，放弃');
+        }
+        return;
+      }
+
+      const skuItems = section.querySelectorAll('li[id^="accessory-item-"]');
+      if (skuItems.length === 0) {
+        if (skuInitAttempts < skuMaxAttempts) {
+          setTimeout(tryInitSkuPanel, 500);
+        } else {
+          console.log('[DJI SKU Switcher] SKU 区域内无项目，放弃');
+        }
+        return;
+      }
+
+      // 只有 1 个 SKU 时不需要切换面板
+      if (skuItems.length <= 1) {
+        console.log('[DJI SKU Switcher] 只有 1 个 SKU，不显示面板');
+        return;
+      }
+
+      console.log('[DJI SKU Switcher] 找到 ' + skuItems.length + ' 个 SKU，渲染面板');
+
+      // 渲染面板
+      renderSkuPanel(Array.from(skuItems));
+
+      // 插入 DOM
+      document.body.appendChild(skuTab);
+      document.body.appendChild(skuPanel);
+
+      // 初始化 tab 位置
+      requestAnimationFrame(() => updateSkuTabPosition());
+
+      // ── 监听选中态变化（MutationObserver）──────────────
+      // 监听 section 内所有 wrapper 的 style 变化（border 是通过 style 属性设置的）
+      const observer = new MutationObserver(() => {
+        updateSkuActiveState();
+      });
+
+      // 监听整个 section 的子树变化，包括 style 和 class 属性
+      observer.observe(section, {
+        attributes: true,
+        attributeFilter: ['style', 'class'],
+        subtree: true,
+      });
+
+      // 额外：定时轮询兜底（某些 React 更新可能不触发 MutationObserver）
+      setInterval(updateSkuActiveState, 1000);
+    }
+
+    // 启动 SKU 面板初始化
+    tryInitSkuPanel();
+  }
 })();
