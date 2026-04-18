@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DJI 语种快速切换2
 // @namespace    https://store.dji.com/
-// @version      4.3.1
+// @version      4.4.0
 // @description  在 DJI 商城及后台编辑页右侧注入语种快捷切换按钮面板，MKT 后台弹窗语种快选，产品页 SKU 快速切换
 // @author       o-park.chen
 // @match        https://store.dji.com/*
@@ -443,8 +443,75 @@
       background: rgba(255,255,255,0.15);
       color: rgba(255,255,255,0.8);
     }
+
+    /* 拖拽手柄 */
+    .dji-drag-handle {
+      width: 100%;
+      height: 16px;
+      cursor: grab;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255,255,255,0.3);
+      font-size: 10px;
+      letter-spacing: 3px;
+      user-select: none;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 4px;
+      flex-shrink: 0;
+    }
+    .dji-drag-handle:hover { color: rgba(255,255,255,0.6); }
+    .dji-drag-handle:active { cursor: grabbing; }
   `;
   document.head.appendChild(style);
+
+  // ── 共用拖拽函数 ──────────────────────────────────────────
+  // panelEl: 面板 DOM, tabEl: 收起/展开 tab DOM, getCollapsed: 返回折叠状态
+  function makeDraggable(panelEl, tabEl, getCollapsed) {
+    let isDragging = false;
+    let startMouseY = 0;
+    let startTop = 0;
+
+    const handle = document.createElement('div');
+    handle.className = 'dji-drag-handle';
+    handle.textContent = '⋮⋮⋮';
+    handle.title = '拖拽移动面板';
+    panelEl.insertBefore(handle, panelEl.firstChild);
+
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      isDragging = true;
+      startMouseY = e.clientY;
+      // 获取当前面板的实际 top 像素值
+      const rect = panelEl.getBoundingClientRect();
+      startTop = rect.top;
+      // 拖拽时去掉 translateY 居中，改为直接 top 定位
+      panelEl.style.transform = getCollapsed() ? 'translateX(100%)' : 'none';
+      panelEl.style.top = startTop + 'px';
+      // tab 也同步
+      tabEl.style.transform = 'none';
+      tabEl.style.top = startTop + 'px';
+      document.body.style.cursor = 'grabbing';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const deltaY = e.clientY - startMouseY;
+      let newTop = startTop + deltaY;
+      // 限制在视口内
+      newTop = Math.max(10, Math.min(window.innerHeight - 60, newTop));
+      panelEl.style.top = newTop + 'px';
+      tabEl.style.top = newTop + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!isDragging) return;
+      isDragging = false;
+      document.body.style.cursor = '';
+    });
+
+    return handle;
+  }
 
   // ── 构建面板 ──────────────────────────────────────────────
   const panel = document.createElement('div');
@@ -580,6 +647,16 @@
   document.body.appendChild(tab);
   document.body.appendChild(panel);
 
+  // 语言面板：加拖拽手柄
+  makeDraggable(panel, tab, () => collapsed);
+
+  // 产品页时，语言面板默认下移，给 SKU 面板留空间
+  const isProductPage = /\/product\//.test(location.pathname);
+  if (isProductPage) {
+    panel.style.top = '65%';
+    tab.style.top = '65%';
+  }
+
   // 初始化 tab 位置（等面板渲染完）
   requestAnimationFrame(() => updateTabPosition());
 
@@ -587,7 +664,6 @@
   // ██ SKU 快速切换浮动面板（仅 DJI Store 产品页）
   // ══════════════════════════════════════════════════════════
 
-  const isProductPage = /\/product\//.test(location.pathname);
   if (isProductPage) {
     console.log('[DJI SKU Switcher] 产品页检测到，启动 SKU 面板');
 
@@ -848,11 +924,21 @@
           if (oos) return;
           const input = li.querySelector('input[type="radio"]');
           if (!input) return;
-          // 锁定滚动位置，阻止页面跳回顶部
-          const scrollY = window.scrollY;
+          // 劫持 scroll 系列方法，阻止 React 触发的自动滚动
+          const origSIV = Element.prototype.scrollIntoView;
+          const origSTo = window.scrollTo;
+          const origScr = window.scroll;
+          Element.prototype.scrollIntoView = function() {};
+          window.scrollTo = function() {};
+          window.scroll = function() {};
+          const scrollY = window.pageYOffset;
           input.click();
-          window.scrollTo(0, scrollY);
-          requestAnimationFrame(() => window.scrollTo(0, scrollY));
+          setTimeout(() => {
+            Element.prototype.scrollIntoView = origSIV;
+            window.scrollTo = origSTo;
+            window.scroll = origScr;
+            origSTo.call(window, 0, scrollY);
+          }, 50);
         });
 
         skuPanel.appendChild(btn);
@@ -902,6 +988,9 @@
       console.log('[DJI SKU Switcher] 找到 ' + skuItems.length + ' 个 SKU，渲染面板');
 
       renderSkuPanel(Array.from(skuItems));
+
+      // SKU 面板：加拖拽手柄
+      makeDraggable(skuPanel, skuTab, () => skuCollapsed);
 
       document.body.appendChild(skuTab);
       document.body.appendChild(skuPanel);
