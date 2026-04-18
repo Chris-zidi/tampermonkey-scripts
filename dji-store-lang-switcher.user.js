@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DJI 语种快速切换2
 // @namespace    https://store.dji.com/
-// @version      4.2.0
+// @version      4.3.0
 // @description  在 DJI 商城及后台编辑页右侧注入语种快捷切换按钮面板 + 产品页 SKU 快速切换浮动面板
 // @author       o-park.chen
 // @match        https://store.dji.com/*
