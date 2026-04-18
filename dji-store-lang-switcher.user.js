@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DJI 语种快速切换2
 // @namespace    https://store.dji.com/
-// @version      4.7.0
+// @version      4.8.0
 // @description  在 DJI 商城及后台编辑页右侧注入语种快捷切换按钮面板，MKT 后台弹窗语种快选，产品页 SKU 快速切换，左侧模块导航面板
 // @author       o-park.chen
 // @match        https://store.dji.com/*
@@ -951,9 +951,8 @@
       title.textContent = 'SKU 切换';
       skuPanel.appendChild(title);
 
-      // 获取 vid → slug 映射
+      // 获取 vid → slug 映射（备用，当前使用 input.click 快速切换）
       const vidSlugMap = getVidSlugMap();
-      console.log('[DJI SKU Switcher] vid→slug 映射:', vidSlugMap);
 
       // 提取名称
       const names = skuItems.map(li => {
@@ -996,35 +995,21 @@
 
         btn.addEventListener('click', () => {
           if (oos) return;
-          // 从 li id 提取 vid
-          const vidMatch = li.id && li.id.match(/accessory-item-(\d+)/);
-          if (!vidMatch) return;
-          const vid = vidMatch[1];
-          const slug = vidSlugMap[vid];
+          if (selected) return; // 已选中的不操作
 
-          if (slug) {
-            // 优先使用 URL 导航（整页刷新，避免 React setState 数据残留）
-            navigateToSku(vid, slug);
-          } else {
-            // 降级：如果没找到 slug 映射，回退到 input.click()
-            console.log('[DJI SKU Switcher] 未找到 vid=' + vid + ' 的 slug，降级为 input.click()');
-            const input = li.querySelector('input[type="radio"]');
-            if (!input) return;
-            const origSIV = Element.prototype.scrollIntoView;
-            const origSTo = window.scrollTo;
-            const origScr = window.scroll;
-            Element.prototype.scrollIntoView = function() {};
-            window.scrollTo = function() {};
-            window.scroll = function() {};
-            const scrollY = window.pageYOffset;
-            input.click();
-            setTimeout(() => {
-              Element.prototype.scrollIntoView = origSIV;
-              window.scrollTo = origSTo;
-              window.scroll = origScr;
-              origSTo.call(window, 0, scrollY);
-            }, 50);
-          }
+          const input = li.querySelector('input[type="radio"]');
+          if (!input) return;
+
+          // 记录当前滚动位置
+          const scrollY = window.pageYOffset;
+
+          // 直接点击，不劫持 scroll（劫持会干扰 React 渲染导致数据残留）
+          input.click();
+
+          // 点击后 React 可能触发 scrollIntoView，用 rAF 在下一帧恢复位置
+          requestAnimationFrame(() => {
+            window.scrollTo(0, scrollY);
+          });
         });
 
         skuPanel.appendChild(btn);
