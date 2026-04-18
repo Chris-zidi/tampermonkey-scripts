@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DJI 语种快速切换2
 // @namespace    https://store.dji.com/
-// @version      4.5.0
+// @version      4.6.0
 // @description  在 DJI 商城及后台编辑页右侧注入语种快捷切换按钮面板，MKT 后台弹窗语种快选，产品页 SKU 快速切换，左侧模块导航面板
 // @author       o-park.chen
 // @match        https://store.dji.com/*
@@ -16,6 +16,10 @@
 
 (function () {
   'use strict';
+
+  // ── 跨模块共享的当前状态（供 switchTo 读取）────────────
+  let _currentVid = null;          // 当前选中 SKU 的 vid
+  let _currentModSelector = null;  // 当前高亮模块的选择器
 
   // ── 语种配置（数据来自弹窗 a.switchcountry_click 实测）────
   // path:   URL 路径段；美国特殊，无前缀，path 为 null
@@ -167,6 +171,18 @@
       url.searchParams.delete('set_region');
       url.searchParams.delete('from');
       url.searchParams.set('set_region', region);
+    }
+
+    // 跳转前保存当前状态（产品页），新页面加载后恢复
+    if (/\/product\//.test(location.pathname)) {
+      try {
+        sessionStorage.setItem('dji-lang-switch-state', JSON.stringify({
+          vid: _currentVid,
+          moduleSelector: _currentModSelector,
+          timestamp: Date.now(),
+        }));
+        console.log('[DJI 语种切换] 已保存状态 vid=' + _currentVid + ' module=' + _currentModSelector);
+      } catch (e) { /* sessionStorage 不可用时静默跳过 */ }
     }
 
     window.location.href = url.toString();
@@ -948,9 +964,15 @@
 
     // ── 更新选中态 ───────────────────────────────────────
     function updateSkuActiveState() {
+      _currentVid = null;
       skuButtons.forEach(({ btn, li }) => {
         const selected = isSkuSelected(li);
         btn.classList.toggle('active', selected);
+        if (selected) {
+          // 从 li id="accessory-item-212451" 中提取 vid
+          const match = li.id && li.id.match(/accessory-item-(\d+)/);
+          if (match) _currentVid = match[1];
+        }
       });
     }
 
@@ -1285,7 +1307,7 @@
         });
 
         modPanel.appendChild(btn);
-        modButtons.push({ btn, el: mod.el });
+        modButtons.push({ btn, el: mod.el, selector: mod.selector, fallback: mod.fallback });
       });
 
       activeModules = modules;
@@ -1311,8 +1333,9 @@
         // 找到当前视口中最靠近顶部的可见模块
         let bestBtn = null;
         let bestTop = Infinity;
+        let bestSelector = null;
 
-        modButtons.forEach(({ btn, el }) => {
+        modButtons.forEach(({ btn, el, selector, fallback }) => {
           const ratio = visibleMap.get(el) || 0;
           if (ratio > 0) {
             const rect = el.getBoundingClientRect();
@@ -1320,6 +1343,7 @@
             if (Math.abs(rect.top) < bestTop) {
               bestTop = Math.abs(rect.top);
               bestBtn = btn;
+              bestSelector = selector || fallback;
             }
           }
         });
@@ -1327,6 +1351,8 @@
         // 更新高亮
         modButtons.forEach(({ btn }) => btn.classList.remove('active'));
         if (bestBtn) bestBtn.classList.add('active');
+        // 同步到顶层变量，供 switchTo 读取
+        _currentModSelector = bestSelector;
       }, {
         threshold: [0, 0.1, 0.25, 0.5],
         rootMargin: '0px 0px -30% 0px',
@@ -1427,6 +1453,128 @@
     }
 
     tryInitModPanel();
+
+    // ══════════════════════════════════════════════════════════
+    // ██ 语种切换后状态恢复（SKU + 模块位置）
+    // ══════════════════════════════════════════════════════════
+
+    (function tryRestoreLangSwitchState() {
+      let stateJson;
+      try {
+        stateJson = sessionStorage.getItem('dji-lang-switch-state');
+        sessionStorage.removeItem('dji-lang-switch-state');
+      } catch (e) { return; }
+      if (!stateJson) return;
+
+      let state;
+      try { state = JSON.parse(stateJson); } catch (e) { return; }
+
+      // 超过 15 秒的数据视为过期
+      if (!state.timestamp || Date.now() - state.timestamp > 15000) {
+        console.log('[DJI 状态恢复] 状态已过期，跳过');
+        return;
+      }
+
+      console.log('[DJI 状态恢复] 检测到切换状态 vid=' + state.vid + ' module=' + state.moduleSelector);
+
+      const savedVid = state.vid;
+      const savedModSelector = state.moduleSelector;
+
+      // ── 步骤 1：恢复 SKU 选中 ───────────────────────────
+      function restoreSku() {
+        return new Promise((resolve) => {
+          if (!savedVid) { resolve(); return; }
+
+          let attempts = 0;
+          const maxAttempts = 20; // 最多等 10 秒
+
+          function tryRestore() {
+            attempts++;
+            const targetLi = document.querySelector('li#accessory-item-' + savedVid);
+            if (!targetLi) {
+              if (attempts < maxAttempts) {
+                setTimeout(tryRestore, 500);
+              } else {
+                console.log('[DJI 状态恢复] 目标 SKU vid=' + savedVid + ' 不存在于当前语种，跳过');
+                resolve();
+              }
+              return;
+            }
+
+            // 检查是否已经是选中状态
+            const wrapper = targetLi.querySelector('div[class*="new-combo-wrapper___"]');
+            const alreadySelected = wrapper && getComputedStyle(wrapper).borderColor.includes('0, 96, 239');
+            if (alreadySelected) {
+              console.log('[DJI 状态恢复] SKU vid=' + savedVid + ' 已是选中状态');
+              resolve();
+              return;
+            }
+
+            // 模拟点击（复用 scroll 劫持逻辑）
+            const input = targetLi.querySelector('input[type="radio"]');
+            if (!input) {
+              console.log('[DJI 状态恢复] 未找到 SKU radio input，跳过');
+              resolve();
+              return;
+            }
+
+            console.log('[DJI 状态恢复] 正在恢复 SKU vid=' + savedVid);
+            const origSIV = Element.prototype.scrollIntoView;
+            const origSTo = window.scrollTo;
+            const origScr = window.scroll;
+            Element.prototype.scrollIntoView = function() {};
+            window.scrollTo = function() {};
+            window.scroll = function() {};
+            input.click();
+            setTimeout(() => {
+              Element.prototype.scrollIntoView = origSIV;
+              window.scrollTo = origSTo;
+              window.scroll = origScr;
+              // SKU 切换后等 React 重渲染
+              setTimeout(resolve, 1500);
+            }, 50);
+          }
+
+          tryRestore();
+        });
+      }
+
+      // ── 步骤 2：恢复模块滚动位置 ──────────────────────────
+      function restoreModule() {
+        if (!savedModSelector) {
+          console.log('[DJI 状态恢复] 无模块位置需要恢复');
+          return;
+        }
+
+        // 等待一小段时间让 DOM 完全就绪
+        let attempts = 0;
+        const maxAttempts = 20;
+
+        function tryScroll() {
+          attempts++;
+          const target = document.querySelector(savedModSelector);
+          if (!target) {
+            if (attempts < maxAttempts) {
+              setTimeout(tryScroll, 500);
+            } else {
+              console.log('[DJI 状态恢复] 模块 ' + savedModSelector + ' 未找到，跳过');
+            }
+            return;
+          }
+
+          console.log('[DJI 状态恢复] 正在滚动到模块 ' + savedModSelector);
+          // 用 auto（无动画）快速定位，避免用户看到从顶部滚下来的过程
+          target.scrollIntoView({ behavior: 'auto', block: 'start' });
+        }
+
+        tryScroll();
+      }
+
+      // ── 执行恢复流程：先 SKU，再模块位置 ───────────────────
+      restoreSku().then(() => {
+        restoreModule();
+      });
+    })();
   }
 
   // ── MKT 后台弹窗语种快选功能 ─────────────────────────────
