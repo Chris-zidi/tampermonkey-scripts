@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DJI 语种快速切换2
 // @namespace    https://store.dji.com/
-// @version      4.9.0
+// @version      4.9.1
 // @description  在 DJI 商城及后台编辑页右侧注入语种快捷切换按钮面板，MKT 后台弹窗语种快选，产品页 SKU 快速切换，左侧模块导航面板
 // @author       o-park.chen
 // @match        https://store.dji.com/*
@@ -1134,8 +1134,8 @@
         z-index: 999999;
         display: flex;
         flex-direction: column;
-        gap: 3px;
-        padding: 6px 8px 8px 8px;
+        gap: 5px;
+        padding: 8px 10px 10px 10px;
         background: rgba(18, 18, 28, 0.93);
         border-radius: 0 14px 14px 0;
         box-shadow: 4px 0 24px rgba(0,0,0,0.5);
@@ -1178,13 +1178,13 @@
       }
 
       #dji-mod-panel .mod-title {
-        font-size: 10px;
+        font-size: 12px;
         font-weight: 700;
         color: rgba(255,255,255,0.5);
-        letter-spacing: 1px;
-        padding: 0 4px 4px 4px;
+        letter-spacing: 1.5px;
+        padding: 2px 6px 6px 6px;
         border-bottom: 1px solid rgba(255,255,255,0.1);
-        margin-bottom: 2px;
+        margin-bottom: 4px;
         white-space: nowrap;
       }
 
@@ -1192,14 +1192,14 @@
         position: relative;
         display: flex;
         align-items: center;
-        gap: 6px;
-        width: 120px;
-        min-height: 30px;
-        padding: 4px 8px;
+        gap: 8px;
+        width: 150px;
+        min-height: 38px;
+        padding: 6px 10px;
         border: 2px solid transparent;
-        border-radius: 8px;
+        border-radius: 10px;
         cursor: pointer;
-        font-size: 12px;
+        font-size: 14px;
         font-weight: 600;
         color: rgba(255,255,255,0.7);
         background: rgba(255,255,255,0.06);
@@ -1224,14 +1224,14 @@
 
       .dji-mod-btn .mod-index {
         flex-shrink: 0;
-        width: 18px;
-        height: 18px;
+        width: 22px;
+        height: 22px;
         border-radius: 50%;
         background: rgba(255,255,255,0.12);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 10px;
+        font-size: 12px;
         font-weight: 700;
         color: rgba(255,255,255,0.6);
       }
