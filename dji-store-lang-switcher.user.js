@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DJI 语种快速切换2
 // @namespace    https://store.dji.com/
-// @version      4.9.1
+// @version      4.10.0
 // @description  在 DJI 商城及后台编辑页右侧注入语种快捷切换按钮面板，MKT 后台弹窗语种快选，产品页 SKU 快速切换，左侧模块导航面板
 // @author       o-park.chen
 // @match        https://store.dji.com/*
@@ -483,10 +483,12 @@
 
   // ── 共用拖拽函数 ──────────────────────────────────────────
   // panelEl: 面板 DOM, tabEl: 收起/展开 tab DOM, getCollapsed: 返回折叠状态
+  // 返回 { handle, state }，state.dragged 标记面板是否被拖拽过
   function makeDraggable(panelEl, tabEl, getCollapsed) {
     let isDragging = false;
     let startMouseY = 0;
     let startTop = 0;
+    const dragState = { dragged: false };
 
     const handle = document.createElement('div');
     handle.className = 'dji-drag-handle';
@@ -498,13 +500,10 @@
       e.preventDefault();
       isDragging = true;
       startMouseY = e.clientY;
-      // 获取当前面板的实际 top 像素值
       const rect = panelEl.getBoundingClientRect();
       startTop = rect.top;
-      // 拖拽时去掉 translateY 居中，改为直接 top 定位
       panelEl.style.transform = getCollapsed() ? 'translateX(100%)' : 'none';
       panelEl.style.top = startTop + 'px';
-      // tab 也同步
       tabEl.style.transform = 'none';
       tabEl.style.top = startTop + 'px';
       document.body.style.cursor = 'grabbing';
@@ -514,7 +513,6 @@
       if (!isDragging) return;
       const deltaY = e.clientY - startMouseY;
       let newTop = startTop + deltaY;
-      // 限制在视口内
       newTop = Math.max(10, Math.min(window.innerHeight - 60, newTop));
       panelEl.style.top = newTop + 'px';
       tabEl.style.top = newTop + 'px';
@@ -523,10 +521,11 @@
     document.addEventListener('mouseup', () => {
       if (!isDragging) return;
       isDragging = false;
+      dragState.dragged = true;  // 标记已拖拽
       document.body.style.cursor = '';
     });
 
-    return handle;
+    return { handle, state: dragState };
   }
 
   // ── 构建面板 ──────────────────────────────────────────────
@@ -540,14 +539,15 @@
   tab.textContent = '◀';
 
   let collapsed = false;
+  let langDragState = { dragged: false };
   tab.addEventListener('click', () => {
     collapsed = !collapsed;
     if (collapsed) {
-      panel.style.transform = 'translateY(-50%) translateX(100%)';
+      panel.style.transform = langDragState.dragged ? 'translateX(100%)' : 'translateY(-50%) translateX(100%)';
       tab.style.right = '0px';
       tab.textContent = '▶';
     } else {
-      panel.style.transform = 'translateY(-50%)';
+      panel.style.transform = langDragState.dragged ? 'none' : 'translateY(-50%)';
       tab.style.right = (panel.offsetWidth) + 'px';
       tab.textContent = '◀';
     }
@@ -664,7 +664,7 @@
   document.body.appendChild(panel);
 
   // 语言面板：加拖拽手柄
-  makeDraggable(panel, tab, () => collapsed);
+  langDragState = makeDraggable(panel, tab, () => collapsed).state;
 
   // 产品页时，语言面板默认下移，给 SKU 面板留空间
   const isProductPage = /\/product\//.test(location.pathname);
@@ -833,6 +833,7 @@
     skuTab.textContent = '◀';
 
     let skuCollapsed = false;
+    let skuDragState = { dragged: false };
     skuTab.addEventListener('click', () => {
       skuCollapsed = !skuCollapsed;
       if (skuCollapsed) {
@@ -840,7 +841,7 @@
         skuTab.style.right = '0px';
         skuTab.textContent = '▶';
       } else {
-        skuPanel.style.transform = '';
+        skuPanel.style.transform = skuDragState.dragged ? 'none' : '';
         skuTab.style.right = skuPanel.offsetWidth + 'px';
         skuTab.textContent = '◀';
       }
@@ -1082,7 +1083,7 @@
       renderSkuPanel(Array.from(skuItems));
 
       // SKU 面板：加拖拽手柄
-      makeDraggable(skuPanel, skuTab, () => skuCollapsed);
+      skuDragState = makeDraggable(skuPanel, skuTab, () => skuCollapsed).state;
 
       document.body.appendChild(skuTab);
       document.body.appendChild(skuPanel);
@@ -1257,14 +1258,15 @@
     modTab.textContent = '▶';
 
     let modCollapsed = false;
+    let modDragState = { dragged: false };
     modTab.addEventListener('click', () => {
       modCollapsed = !modCollapsed;
       if (modCollapsed) {
-        modPanel.style.transform = 'translateY(-50%) translateX(-100%)';
+        modPanel.style.transform = modDragState.dragged ? 'translateX(-100%)' : 'translateY(-50%) translateX(-100%)';
         modTab.style.left = '0px';
         modTab.textContent = '▶';
       } else {
-        modPanel.style.transform = 'translateY(-50%)';
+        modPanel.style.transform = modDragState.dragged ? 'none' : 'translateY(-50%)';
         modTab.style.left = modPanel.offsetWidth + 'px';
         modTab.textContent = '◀';
       }
@@ -1281,6 +1283,7 @@
       let isDragging = false;
       let startMouseY = 0;
       let startTop = 0;
+      const dragState = { dragged: false };
 
       const handle = document.createElement('div');
       handle.className = 'dji-drag-handle';
@@ -1313,10 +1316,11 @@
       document.addEventListener('mouseup', () => {
         if (!isDragging) return;
         isDragging = false;
+        dragState.dragged = true;
         document.body.style.cursor = '';
       });
 
-      return handle;
+      return { handle, state: dragState };
     }
 
     // ── 模块检测：查找页面上实际存在的模块 ───────────────
@@ -1492,7 +1496,7 @@
         renderModPanel(modules);
 
         // 拖拽
-        makeDraggableLeft(modPanel, modTab, () => modCollapsed);
+        modDragState = makeDraggableLeft(modPanel, modTab, () => modCollapsed).state;
 
         document.body.appendChild(modTab);
         document.body.appendChild(modPanel);
