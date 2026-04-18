@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DJI 语种快速切换2
 // @namespace    https://store.dji.com/
-// @version      4.8.0
+// @version      4.8.1
 // @description  在 DJI 商城及后台编辑页右侧注入语种快捷切换按钮面板，MKT 后台弹窗语种快选，产品页 SKU 快速切换，左侧模块导航面板
 // @author       o-park.chen
 // @match        https://store.dji.com/*
@@ -1003,13 +1003,27 @@
           // 记录当前滚动位置
           const scrollY = window.pageYOffset;
 
-          // 直接点击，不劫持 scroll（劫持会干扰 React 渲染导致数据残留）
+          // 只劫持 scrollIntoView（React 用它跳到 SKU 区）
+          // 不劫持 scrollTo/scroll（劫持它们会干扰 React 数据渲染）
+          const origSIV = Element.prototype.scrollIntoView;
+          Element.prototype.scrollIntoView = function() {};
+
           input.click();
 
-          // 点击后 React 可能触发 scrollIntoView，用 rAF 在下一帧恢复位置
-          requestAnimationFrame(() => {
+          // 持续守住滚动位置 300ms（覆盖 React 异步触发的 scroll）
+          let guardCount = 0;
+          const guardInterval = setInterval(() => {
             window.scrollTo(0, scrollY);
-          });
+            guardCount++;
+            if (guardCount >= 15) clearInterval(guardInterval); // 15 x 20ms = 300ms
+          }, 20);
+
+          // 300ms 后恢复 scrollIntoView 并停止守护
+          setTimeout(() => {
+            Element.prototype.scrollIntoView = origSIV;
+            clearInterval(guardInterval);
+            window.scrollTo(0, scrollY);
+          }, 350);
         });
 
         skuPanel.appendChild(btn);
