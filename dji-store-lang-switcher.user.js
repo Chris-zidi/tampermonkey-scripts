@@ -2,11 +2,12 @@
 // @name         DJI 语种快速切换2
 // @namespace    https://store.dji.com/
 // @version      4.3.0
-// @description  在 DJI 商城及后台编辑页右侧注入语种快捷切换按钮面板 + 产品页 SKU 快速切换浮动面板
+// @description  在 DJI 商城及后台编辑页右侧注入语种快捷切换按钮面板，MKT 后台弹窗语种快选，产品页 SKU 快速切换
 // @author       o-park.chen
 // @match        https://store.dji.com/*
 // @match        https://stag-www-reactor.dbeta.me/*
 // @match        https://www-reactor.dji.com/*
+// @match        https://mkt.djiits.com/*
 // @grant        none
 // @run-at       document-end
 // @updateURL    https://raw.githubusercontent.com/Chris-zidi/tampermonkey-scripts/main/dji-store-lang-switcher.user.js
@@ -121,6 +122,13 @@
   const host = location.hostname;
   const isDbeta = host.includes('dbeta.me');
   const isReactor = host.includes('www-reactor.dji.com');
+  const isMkt = host.includes('mkt.djiits.com');
+
+  // ── MKT 后台：弹窗语种快选（独立逻辑）────────────────────
+  if (isMkt) {
+    initMktLangSelector();
+    return; // MKT 站不需要右侧语种切换面板
+  }
 
   // ── URL 切换函数 ──────────────────────────────────────────
   // path=null 表示美国，URL 无语种前缀
@@ -576,7 +584,7 @@
   requestAnimationFrame(() => updateTabPosition());
 
   // ══════════════════════════════════════════════════════════
-  // ██ SKU 快速切换浮动面板（仅产品页）
+  // ██ SKU 快速切换浮动面板（仅 DJI Store 产品页）
   // ══════════════════════════════════════════════════════════
 
   const isProductPage = /\/product\//.test(location.pathname);
@@ -755,7 +763,6 @@
     // ── 提取 SKU 公共前缀（用于缩短显示名称）────────────
     function findCommonPrefix(names) {
       if (names.length <= 1) return '';
-      // 按空格分词，找公共前缀词
       const wordArrays = names.map(n => n.trim().split(/\s+/));
       const minLen = Math.min(...wordArrays.map(w => w.length));
       let commonCount = 0;
@@ -767,7 +774,6 @@
           break;
         }
       }
-      // 至少保留最后一个词不同的部分，但如果公共前缀占比太低就不截
       if (commonCount === 0) return '';
       return wordArrays[0].slice(0, commonCount).join(' ');
     }
@@ -787,7 +793,7 @@
     }
 
     // ── 渲染 SKU 面板按钮 ────────────────────────────────
-    let skuButtons = []; // { btn, li } 映射
+    let skuButtons = [];
 
     function renderSkuPanel(skuItems) {
       skuPanel.innerHTML = '';
@@ -810,7 +816,6 @@
 
       skuItems.forEach((li, i) => {
         const fullName = names[i];
-        // 去掉公共前缀，如果去掉后为空则保留完整名称
         let shortName = prefix ? fullName.substring(prefix.length).trim() : fullName;
         if (!shortName) shortName = fullName;
 
@@ -855,10 +860,6 @@
       skuButtons.forEach(({ btn, li }) => {
         const selected = isSkuSelected(li);
         btn.classList.toggle('active', selected);
-        const idx = btn.querySelector('.sku-index');
-        if (idx) {
-          // active class 已通过 CSS 处理
-        }
       });
     }
 
@@ -888,7 +889,6 @@
         return;
       }
 
-      // 只有 1 个 SKU 时不需要切换面板
       if (skuItems.length <= 1) {
         console.log('[DJI SKU Switcher] 只有 1 个 SKU，不显示面板');
         return;
@@ -896,34 +896,153 @@
 
       console.log('[DJI SKU Switcher] 找到 ' + skuItems.length + ' 个 SKU，渲染面板');
 
-      // 渲染面板
       renderSkuPanel(Array.from(skuItems));
 
-      // 插入 DOM
       document.body.appendChild(skuTab);
       document.body.appendChild(skuPanel);
 
-      // 初始化 tab 位置
       requestAnimationFrame(() => updateSkuTabPosition());
 
-      // ── 监听选中态变化（MutationObserver）──────────────
-      // 监听 section 内所有 wrapper 的 style 变化（border 是通过 style 属性设置的）
+      // 监听选中态变化
       const observer = new MutationObserver(() => {
         updateSkuActiveState();
       });
-
-      // 监听整个 section 的子树变化，包括 style 和 class 属性
       observer.observe(section, {
         attributes: true,
         attributeFilter: ['style', 'class'],
         subtree: true,
       });
 
-      // 额外：定时轮询兜底（某些 React 更新可能不触发 MutationObserver）
+      // 定时轮询兜底
       setInterval(updateSkuActiveState, 1000);
     }
 
-    // 启动 SKU 面板初始化
     tryInitSkuPanel();
+  }
+
+  // ── MKT 后台弹窗语种快选功能 ─────────────────────────────
+  function initMktLangSelector() {
+    // 语种配置：value 对应 checkbox 的 value 属性
+    const MKT_LANGS = [
+      { label: 'English',   value: 'en',    gradient: 'linear-gradient(135deg, #34d399, #06b6d4)' },
+      { label: '中文',      value: 'zh-CN', gradient: 'linear-gradient(135deg, #f6a623, #f97316)' },
+      { label: '繁體中文',  value: 'zh-TW', gradient: 'linear-gradient(135deg, #a78bfa, #ec4899)' },
+      { label: '日本语',    value: 'ja',    gradient: 'linear-gradient(135deg, #f472b6, #fb7185)' },
+      { label: 'Deutsch',   value: 'de',    gradient: 'linear-gradient(135deg, #fb923c, #f97316)' },
+      { label: 'Français',  value: 'fr',    gradient: 'linear-gradient(135deg, #38bdf8, #06b6d4)' },
+      { label: '한국어',    value: 'ko',    gradient: 'linear-gradient(135deg, #818cf8, #6366f1)' },
+      { label: 'español',   value: 'es',    gradient: 'linear-gradient(135deg, #f87171, #fb923c)' },
+      { label: 'Italiano',  value: 'it',    gradient: 'linear-gradient(135deg, #4ade80, #34d399)' },
+    ];
+
+    // 注入样式
+    const style = document.createElement('style');
+    style.textContent = `
+      #mkt-lang-panel {
+        position: fixed;
+        left: 6px;
+        top: 100px;
+        z-index: 999999;
+        display: none;
+        flex-direction: column;
+        gap: 6px;
+        padding: 10px 8px;
+        background: rgba(18, 18, 28, 0.93);
+        border-radius: 12px;
+        box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+        backdrop-filter: blur(10px);
+        user-select: none;
+      }
+
+      #mkt-lang-panel.visible {
+        display: flex;
+      }
+
+      .mkt-lang-btn {
+        width: 120px;
+        height: 40px;
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 700;
+        color: #fff;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        gap: 6px;
+        transition: transform 0.15s, box-shadow 0.15s;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+        white-space: nowrap;
+      }
+
+      .mkt-lang-btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 5px 18px rgba(0,0,0,0.45);
+      }
+
+      .mkt-lang-btn .mkt-star {
+        font-size: 14px;
+        flex-shrink: 0;
+      }
+    `;
+    document.head.appendChild(style);
+
+    // 构建面板
+    const panel = document.createElement('div');
+    panel.id = 'mkt-lang-panel';
+
+    MKT_LANGS.forEach((lang) => {
+      const btn = document.createElement('button');
+      btn.className = 'mkt-lang-btn';
+      btn.style.background = lang.gradient;
+      btn.innerHTML = '<span class="mkt-star">⭐</span>' + lang.label;
+      btn.title = '只选 ' + lang.label;
+
+      btn.addEventListener('click', () => {
+        selectOnlyLang(lang.value);
+      });
+
+      panel.appendChild(btn);
+    });
+
+    document.body.appendChild(panel);
+
+    // 只勾选指定语种：先取消所有已勾选的，再勾选目标
+    function selectOnlyLang(targetValue) {
+      const modal = document.querySelector('.modal.fade.in');
+      if (!modal) return;
+
+      const labels = modal.querySelectorAll('label.col-md-3');
+      labels.forEach((label) => {
+        const cb = label.querySelector('input[type="checkbox"]');
+        if (!cb) return;
+
+        if (cb.value === targetValue) {
+          // 目标语种：确保勾选
+          if (!cb.checked) label.click();
+        } else {
+          // 非目标语种：确保取消
+          if (cb.checked) label.click();
+        }
+      });
+    }
+
+    // 监听弹窗出现/消失，控制面板显隐
+    // 用定时轮询代替 MutationObserver，避免 observer 回调触发 DOM 变化导致无限循环
+    let mktPanelVisible = false;
+    setInterval(() => {
+      const modal = document.querySelector('.modal.fade.in');
+      const hasLangCheckbox = modal && modal.querySelector('label.col-md-3 input[type="checkbox"]');
+
+      if (hasLangCheckbox && !mktPanelVisible) {
+        panel.classList.add('visible');
+        mktPanelVisible = true;
+      } else if (!hasLangCheckbox && mktPanelVisible) {
+        panel.classList.remove('visible');
+        mktPanelVisible = false;
+      }
+    }, 300);
   }
 })();
