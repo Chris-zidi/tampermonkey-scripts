@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DJI 语种快速切换2
 // @namespace    https://store.dji.com/
-// @version      4.6.0
+// @version      4.7.0
 // @description  在 DJI 商城及后台编辑页右侧注入语种快捷切换按钮面板，MKT 后台弹窗语种快选，产品页 SKU 快速切换，左侧模块导航面板
 // @author       o-park.chen
 // @match        https://store.dji.com/*
@@ -884,6 +884,60 @@
       return wrapper.className.includes('out-of-stock');
     }
 
+    // ── 从 __PRELOADED_STATE__ 获取 vid → slug 映射 ──────
+    function getVidSlugMap() {
+      const map = {};
+      try {
+        const state = window.__PRELOADED_STATE__;
+        if (!state) return map;
+        // 遍历所有顶层 key 找 variants 数组
+        Object.keys(state).forEach((key) => {
+          const section = state[key];
+          if (!section) return;
+          // 直接在 variants 数组中查找
+          const variants = section.variants || (section.product && section.product.variants);
+          if (Array.isArray(variants)) {
+            variants.forEach((v) => {
+              if (v && v.id && v.slug) {
+                map[String(v.id)] = v.slug;
+              }
+            });
+          }
+        });
+      } catch (e) {
+        console.log('[DJI SKU Switcher] 读取 __PRELOADED_STATE__ 失败', e);
+      }
+      return map;
+    }
+
+    // ── 通过 URL 导航切换 SKU（避免 React setState 数据残留）──
+    function navigateToSku(vid, slug) {
+      const url = new URL(window.location.href);
+      const parts = url.pathname.split('/').filter(Boolean);
+
+      // 找到 'product' 段的位置，替换其后面的 slug
+      const prodIdx = parts.indexOf('product');
+      if (prodIdx >= 0 && prodIdx + 1 < parts.length) {
+        parts[prodIdx + 1] = slug;
+      }
+
+      url.pathname = '/' + parts.join('/');
+      url.searchParams.set('vid', vid);
+
+      // 保存当前模块位置，导航后恢复
+      try {
+        sessionStorage.setItem('dji-lang-switch-state', JSON.stringify({
+          vid: vid,  // 目标 vid（不需要恢复 SKU，因为 URL 已经包含了）
+          moduleSelector: _currentModSelector,
+          timestamp: Date.now(),
+          skipSkuRestore: true,  // 标记：不需要恢复 SKU，URL 已包含正确 vid
+        }));
+      } catch (e) { /* 静默 */ }
+
+      console.log('[DJI SKU Switcher] URL 导航切换 SKU → ' + url.toString());
+      window.location.href = url.toString();
+    }
+
     // ── 渲染 SKU 面板按钮 ────────────────────────────────
     let skuButtons = [];
 
@@ -896,6 +950,10 @@
       title.className = 'sku-title';
       title.textContent = 'SKU 切换';
       skuPanel.appendChild(title);
+
+      // 获取 vid → slug 映射
+      const vidSlugMap = getVidSlugMap();
+      console.log('[DJI SKU Switcher] vid→slug 映射:', vidSlugMap);
 
       // 提取名称
       const names = skuItems.map(li => {
@@ -938,23 +996,35 @@
 
         btn.addEventListener('click', () => {
           if (oos) return;
-          const input = li.querySelector('input[type="radio"]');
-          if (!input) return;
-          // 劫持 scroll 系列方法，阻止 React 触发的自动滚动
-          const origSIV = Element.prototype.scrollIntoView;
-          const origSTo = window.scrollTo;
-          const origScr = window.scroll;
-          Element.prototype.scrollIntoView = function() {};
-          window.scrollTo = function() {};
-          window.scroll = function() {};
-          const scrollY = window.pageYOffset;
-          input.click();
-          setTimeout(() => {
-            Element.prototype.scrollIntoView = origSIV;
-            window.scrollTo = origSTo;
-            window.scroll = origScr;
-            origSTo.call(window, 0, scrollY);
-          }, 50);
+          // 从 li id 提取 vid
+          const vidMatch = li.id && li.id.match(/accessory-item-(\d+)/);
+          if (!vidMatch) return;
+          const vid = vidMatch[1];
+          const slug = vidSlugMap[vid];
+
+          if (slug) {
+            // 优先使用 URL 导航（整页刷新，避免 React setState 数据残留）
+            navigateToSku(vid, slug);
+          } else {
+            // 降级：如果没找到 slug 映射，回退到 input.click()
+            console.log('[DJI SKU Switcher] 未找到 vid=' + vid + ' 的 slug，降级为 input.click()');
+            const input = li.querySelector('input[type="radio"]');
+            if (!input) return;
+            const origSIV = Element.prototype.scrollIntoView;
+            const origSTo = window.scrollTo;
+            const origScr = window.scroll;
+            Element.prototype.scrollIntoView = function() {};
+            window.scrollTo = function() {};
+            window.scroll = function() {};
+            const scrollY = window.pageYOffset;
+            input.click();
+            setTimeout(() => {
+              Element.prototype.scrollIntoView = origSIV;
+              window.scrollTo = origSTo;
+              window.scroll = origScr;
+              origSTo.call(window, 0, scrollY);
+            }, 50);
+          }
         });
 
         skuPanel.appendChild(btn);
@@ -1475,15 +1545,18 @@
         return;
       }
 
-      console.log('[DJI 状态恢复] 检测到切换状态 vid=' + state.vid + ' module=' + state.moduleSelector);
+      console.log('[DJI 状态恢复] 检测到切换状态 vid=' + state.vid + ' module=' + state.moduleSelector +
+        (state.skipSkuRestore ? ' (SKU已通过URL恢复)' : ''));
 
       const savedVid = state.vid;
       const savedModSelector = state.moduleSelector;
+      const skipSkuRestore = !!state.skipSkuRestore;
 
       // ── 步骤 1：恢复 SKU 选中 ───────────────────────────
       function restoreSku() {
         return new Promise((resolve) => {
-          if (!savedVid) { resolve(); return; }
+          // 如果是 SKU URL 导航过来的，URL 已包含正确 vid，无需再恢复
+          if (skipSkuRestore || !savedVid) { resolve(); return; }
 
           let attempts = 0;
           const maxAttempts = 20; // 最多等 10 秒
@@ -1572,7 +1645,9 @@
 
       // ── 执行恢复流程：先 SKU，再模块位置 ───────────────────
       restoreSku().then(() => {
-        restoreModule();
+        // SKU URL 导航过来时，等页面 hydration 完成后再滚动
+        const delay = skipSkuRestore ? 2000 : 0;
+        setTimeout(() => restoreModule(), delay);
       });
     })();
   }
