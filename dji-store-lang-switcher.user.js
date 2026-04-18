@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DJI 语种快速切换2
 // @namespace    https://store.dji.com/
-// @version      4.8.1
+// @version      4.8.2
 // @description  在 DJI 商城及后台编辑页右侧注入语种快捷切换按钮面板，MKT 后台弹窗语种快选，产品页 SKU 快速切换，左侧模块导航面板
 // @author       o-park.chen
 // @match        https://store.dji.com/*
@@ -995,7 +995,8 @@
 
         btn.addEventListener('click', () => {
           if (oos) return;
-          if (selected) return; // 已选中的不操作
+          // 实时检测是否已选中（不能用闭包中的静态值）
+          if (isSkuSelected(li)) return;
 
           const input = li.querySelector('input[type="radio"]');
           if (!input) return;
