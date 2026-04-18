@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         DJI 语种快速切换2
 // @namespace    https://store.dji.com/
-// @version      4.4.0
-// @description  在 DJI 商城及后台编辑页右侧注入语种快捷切换按钮面板，MKT 后台弹窗语种快选，产品页 SKU 快速切换
+// @version      4.5.0
+// @description  在 DJI 商城及后台编辑页右侧注入语种快捷切换按钮面板，MKT 后台弹窗语种快选，产品页 SKU 快速切换，左侧模块导航面板
 // @author       o-park.chen
 // @match        https://store.dji.com/*
 // @match        https://stag-www-reactor.dbeta.me/*
@@ -1012,6 +1012,421 @@
     }
 
     tryInitSkuPanel();
+
+    // ══════════════════════════════════════════════════════════
+    // ██ 左侧模块导航面板（仅 DJI Store 产品页）
+    // ══════════════════════════════════════════════════════════
+
+    console.log('[DJI 模块导航] 产品页检测到，启动模块导航面板');
+
+    // ── 模块配置（中文标签固定，选择器跨语种稳定）──────────
+    const MODULE_MAP = [
+      { label: '产品概览', selector: '[data-test-locator="sectionProductOverview"]', fallback: '#product-container' },
+      { label: '套装选择', selector: '[data-test-locator="sectionProductComboPools"]', fallback: '#anchorSelectoption' },
+      { label: '深入了解', selector: '[data-test-locator="sectionSellingPoint"]', fallback: '#anchorCloserlook' },
+      { label: '包装清单', selector: '[data-test-locator="sectionInTheBox"]', fallback: '#anchorBox' },
+      { label: '场景展示', selector: '#sectionProductImages', fallback: '[class*="userWorks__user-works"]' },
+      { label: '产品对比', selector: '#ProductContrast', fallback: '[class*="product-contrast-module"]' },
+      { label: 'FAQ',     selector: '[data-test-locator="sectionProductFAQ"]', fallback: '#faq-module' },
+      { label: '脚注',    selector: '[data-test-locator="sectionProductFootNote"]', fallback: null },
+    ];
+
+    // ── 模块导航面板样式 ─────────────────────────────────
+    const modStyle = document.createElement('style');
+    modStyle.textContent = `
+      #dji-mod-panel {
+        position: fixed;
+        top: 50%;
+        left: 0;
+        transform: translateY(-50%);
+        z-index: 999999;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        padding: 6px 8px 8px 8px;
+        background: rgba(18, 18, 28, 0.93);
+        border-radius: 0 14px 14px 0;
+        box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+        backdrop-filter: blur(10px);
+        transition: transform 0.25s cubic-bezier(.4,0,.2,1);
+        user-select: none;
+        max-height: 80vh;
+        overflow-y: auto;
+        overflow-x: hidden;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255,255,255,0.2) transparent;
+      }
+
+      #dji-mod-panel.collapsed {
+        transform: translateY(-50%) translateX(calc(-100%));
+      }
+
+      #dji-mod-tab {
+        position: fixed;
+        top: 50%;
+        left: 0;
+        transform: translateY(-50%);
+        z-index: 999998;
+        width: 20px;
+        height: 56px;
+        background: rgba(18, 18, 28, 0.93);
+        border-radius: 0 8px 8px 0;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        color: rgba(255,255,255,0.8);
+        box-shadow: 3px 0 10px rgba(0,0,0,0.4);
+        transition: color 0.15s, left 0.25s cubic-bezier(.4,0,.2,1);
+      }
+
+      #dji-mod-tab:hover {
+        color: #fff;
+      }
+
+      #dji-mod-panel .mod-title {
+        font-size: 10px;
+        font-weight: 700;
+        color: rgba(255,255,255,0.5);
+        letter-spacing: 1px;
+        padding: 0 4px 4px 4px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        margin-bottom: 2px;
+        white-space: nowrap;
+      }
+
+      .dji-mod-btn {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        width: 120px;
+        min-height: 30px;
+        padding: 4px 8px;
+        border: 2px solid transparent;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        color: rgba(255,255,255,0.7);
+        background: rgba(255,255,255,0.06);
+        transition: all 0.2s;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+        text-align: left;
+        line-height: 1.3;
+      }
+
+      .dji-mod-btn:hover {
+        background: rgba(255,255,255,0.15);
+        color: #fff;
+        transform: scale(1.03);
+      }
+
+      .dji-mod-btn.active {
+        border-color: rgba(56, 189, 248, 0.8);
+        background: rgba(56, 189, 248, 0.15);
+        color: #fff;
+        box-shadow: 0 2px 10px rgba(56,189,248,0.25);
+      }
+
+      .dji-mod-btn .mod-index {
+        flex-shrink: 0;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.12);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 700;
+        color: rgba(255,255,255,0.6);
+      }
+
+      .dji-mod-btn.active .mod-index {
+        background: rgba(56, 189, 248, 0.5);
+        color: #fff;
+      }
+
+      .dji-mod-btn .mod-label {
+        flex: 1;
+      }
+    `;
+    document.head.appendChild(modStyle);
+
+    // ── 模块导航面板构建 ─────────────────────────────────
+    const modPanel = document.createElement('div');
+    modPanel.id = 'dji-mod-panel';
+
+    const modTab = document.createElement('div');
+    modTab.id = 'dji-mod-tab';
+    modTab.title = '收起/展开模块导航';
+    modTab.textContent = '▶';
+
+    let modCollapsed = false;
+    modTab.addEventListener('click', () => {
+      modCollapsed = !modCollapsed;
+      if (modCollapsed) {
+        modPanel.style.transform = 'translateY(-50%) translateX(-100%)';
+        modTab.style.left = '0px';
+        modTab.textContent = '▶';
+      } else {
+        modPanel.style.transform = 'translateY(-50%)';
+        modTab.style.left = modPanel.offsetWidth + 'px';
+        modTab.textContent = '◀';
+      }
+    });
+
+    function updateModTabPosition() {
+      if (!modCollapsed) {
+        modTab.style.left = modPanel.offsetWidth + 'px';
+      }
+    }
+
+    // ── 左侧拖拽函数（与右侧镜像）─────────────────────
+    function makeDraggableLeft(panelEl, tabEl, getCollapsedFn) {
+      let isDragging = false;
+      let startMouseY = 0;
+      let startTop = 0;
+
+      const handle = document.createElement('div');
+      handle.className = 'dji-drag-handle';
+      handle.textContent = '⋮⋮⋮';
+      handle.title = '拖拽移动面板';
+      panelEl.insertBefore(handle, panelEl.firstChild);
+
+      handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        isDragging = true;
+        startMouseY = e.clientY;
+        const rect = panelEl.getBoundingClientRect();
+        startTop = rect.top;
+        panelEl.style.transform = getCollapsedFn() ? 'translateX(-100%)' : 'none';
+        panelEl.style.top = startTop + 'px';
+        tabEl.style.transform = 'none';
+        tabEl.style.top = startTop + 'px';
+        document.body.style.cursor = 'grabbing';
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const deltaY = e.clientY - startMouseY;
+        let newTop = startTop + deltaY;
+        newTop = Math.max(10, Math.min(window.innerHeight - 60, newTop));
+        panelEl.style.top = newTop + 'px';
+        tabEl.style.top = newTop + 'px';
+      });
+
+      document.addEventListener('mouseup', () => {
+        if (!isDragging) return;
+        isDragging = false;
+        document.body.style.cursor = '';
+      });
+
+      return handle;
+    }
+
+    // ── 模块检测：查找页面上实际存在的模块 ───────────────
+    let activeModules = [];     // { label, el, btn }
+    let modObserver = null;     // IntersectionObserver 实例
+    let modButtons = [];        // 所有按钮引用
+
+    function findModuleEl(modConfig) {
+      return document.querySelector(modConfig.selector) ||
+             (modConfig.fallback ? document.querySelector(modConfig.fallback) : null);
+    }
+
+    function scanModules() {
+      const found = [];
+      MODULE_MAP.forEach((mod) => {
+        const el = findModuleEl(mod);
+        if (el) {
+          found.push({ label: mod.label, el: el, selector: mod.selector, fallback: mod.fallback });
+        }
+      });
+      return found;
+    }
+
+    // ── 渲染模块导航按钮 ─────────────────────────────────
+    function renderModPanel(modules) {
+      // 保留拖拽手柄
+      const existingHandle = modPanel.querySelector('.dji-drag-handle');
+      modPanel.innerHTML = '';
+      if (existingHandle) modPanel.appendChild(existingHandle);
+
+      modButtons = [];
+
+      // 标题
+      const title = document.createElement('div');
+      title.className = 'mod-title';
+      title.textContent = '模块导航';
+      modPanel.appendChild(title);
+
+      modules.forEach((mod, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'dji-mod-btn';
+        btn.title = mod.label;
+
+        const index = document.createElement('span');
+        index.className = 'mod-index';
+        index.textContent = String(i + 1);
+
+        const label = document.createElement('span');
+        label.className = 'mod-label';
+        label.textContent = mod.label;
+
+        btn.appendChild(index);
+        btn.appendChild(label);
+
+        // 点击跳转（带标记防止被 scroll 劫持）
+        btn.addEventListener('click', () => {
+          mod.el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+
+        modPanel.appendChild(btn);
+        modButtons.push({ btn, el: mod.el });
+      });
+
+      activeModules = modules;
+    }
+
+    // ── IntersectionObserver 滚动高亮 ────────────────────
+    function setupScrollHighlight() {
+      // 清理旧 observer
+      if (modObserver) {
+        modObserver.disconnect();
+        modObserver = null;
+      }
+      if (modButtons.length === 0) return;
+
+      // 用 Map 记录各模块的可见比例
+      const visibleMap = new Map();
+
+      modObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          visibleMap.set(entry.target, entry.intersectionRatio);
+        });
+
+        // 找到当前视口中最靠近顶部的可见模块
+        let bestBtn = null;
+        let bestTop = Infinity;
+
+        modButtons.forEach(({ btn, el }) => {
+          const ratio = visibleMap.get(el) || 0;
+          if (ratio > 0) {
+            const rect = el.getBoundingClientRect();
+            // 优先选最靠近视口顶部的
+            if (Math.abs(rect.top) < bestTop) {
+              bestTop = Math.abs(rect.top);
+              bestBtn = btn;
+            }
+          }
+        });
+
+        // 更新高亮
+        modButtons.forEach(({ btn }) => btn.classList.remove('active'));
+        if (bestBtn) bestBtn.classList.add('active');
+      }, {
+        threshold: [0, 0.1, 0.25, 0.5],
+        rootMargin: '0px 0px -30% 0px',
+      });
+
+      modButtons.forEach(({ el }) => modObserver.observe(el));
+    }
+
+    // ── SKU 切换后刷新模块检测 ───────────────────────────
+    function refreshModules() {
+      console.log('[DJI 模块导航] 刷新模块检测...');
+      const modules = scanModules();
+      renderModPanel(modules);
+      setupScrollHighlight();
+      requestAnimationFrame(() => updateModTabPosition());
+      console.log('[DJI 模块导航] 检测到 ' + modules.length + ' 个模块：' +
+        modules.map(m => m.label).join(', '));
+    }
+
+    // ── 监听 SKU 切换 ────────────────────────────────────
+    function watchSkuChanges() {
+      const comboSection = document.querySelector('[data-test-locator="sectionProductComboPools"]');
+      if (!comboSection) return;
+
+      // 监听 SKU 区域的点击（SKU 切换）
+      comboSection.addEventListener('click', (e) => {
+        const item = e.target.closest('li[id^="accessory-item-"]');
+        if (!item) return;
+        // SKU 切换后 React 重新渲染需要时间，延迟刷新
+        setTimeout(refreshModules, 2000);
+      });
+
+      // 也监听面板上的 SKU 按钮点击
+      if (document.getElementById('dji-sku-panel')) {
+        document.getElementById('dji-sku-panel').addEventListener('click', (e) => {
+          const btn = e.target.closest('.dji-sku-btn');
+          if (!btn) return;
+          setTimeout(refreshModules, 2000);
+        });
+      }
+    }
+
+    // ── 等待页面模块加载后初始化 ─────────────────────────
+    let modInitAttempts = 0;
+    const modMaxAttempts = 30; // 最多等 15 秒
+
+    function tryInitModPanel() {
+      modInitAttempts++;
+      // 至少等到"产品概览"模块出现
+      const overview = document.querySelector('[data-test-locator="sectionProductOverview"]') ||
+                       document.querySelector('#product-container');
+      if (!overview) {
+        if (modInitAttempts < modMaxAttempts) {
+          setTimeout(tryInitModPanel, 500);
+        } else {
+          console.log('[DJI 模块导航] 未检测到产品概览模块，放弃');
+        }
+        return;
+      }
+
+      // 再等一会让其他模块加载（hydration-on-demand 延迟加载）
+      setTimeout(() => {
+        const modules = scanModules();
+        if (modules.length === 0) {
+          console.log('[DJI 模块导航] 未检测到任何模块，放弃');
+          return;
+        }
+
+        console.log('[DJI 模块导航] 检测到 ' + modules.length + ' 个模块：' +
+          modules.map(m => m.label).join(', '));
+
+        renderModPanel(modules);
+
+        // 拖拽
+        makeDraggableLeft(modPanel, modTab, () => modCollapsed);
+
+        document.body.appendChild(modTab);
+        document.body.appendChild(modPanel);
+
+        requestAnimationFrame(() => updateModTabPosition());
+
+        // 启动滚动高亮
+        setupScrollHighlight();
+
+        // 监听 SKU 切换
+        watchSkuChanges();
+
+        // 兜底：每 5 秒检查一次是否有新模块被懒加载进来
+        let lastModCount = modules.length;
+        setInterval(() => {
+          const current = scanModules();
+          if (current.length !== lastModCount) {
+            lastModCount = current.length;
+            refreshModules();
+          }
+        }, 5000);
+      }, 1500);
+    }
+
+    tryInitModPanel();
   }
 
   // ── MKT 后台弹窗语种快选功能 ─────────────────────────────
