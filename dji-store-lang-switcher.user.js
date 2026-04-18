@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DJI 语种快速切换2
 // @namespace    https://store.dji.com/
-// @version      4.3.0
+// @version      4.3.1
 // @description  在 DJI 商城及后台编辑页右侧注入语种快捷切换按钮面板，MKT 后台弹窗语种快选，产品页 SKU 快速切换
 // @author       o-park.chen
 // @match        https://store.dji.com/*
@@ -847,7 +847,12 @@
         btn.addEventListener('click', () => {
           if (oos) return;
           const input = li.querySelector('input[type="radio"]');
-          if (input) input.click();
+          if (!input) return;
+          // 锁定滚动位置，阻止页面跳回顶部
+          const scrollY = window.scrollY;
+          input.click();
+          window.scrollTo(0, scrollY);
+          requestAnimationFrame(() => window.scrollTo(0, scrollY));
         });
 
         skuPanel.appendChild(btn);
