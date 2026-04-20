@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.13.0
-// @description   电源规格国家选择器 + Stormsend语种Tab固定（5种页面支持）
+// @version       2.14.0
+// @description   电源规格国家选择器 + Stormsend语种Tab固定（6种页面支持，含Terminator）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
 // @grant         none
@@ -144,12 +144,16 @@
 
     /***********************************************
      * 页面类型检测
-     * - MODAL     : mkt.djiits.com core_selling_points，checkbox 在弹窗里
-     * - FORM      : stormsend.djiits.com，checkbox 直接在页面，有语言选择
-     * - FORM_MKT  : mkt.djiits.com EAN 等页面，checkbox 直接在页面，React 组件
-     * - SALES_BAN : mkt.djiits.com sales_bans 页面，radio 按钮选择销售状态
+     * - MODAL      : mkt.djiits.com core_selling_points，checkbox 在弹窗里
+     * - FORM       : stormsend.djiits.com，checkbox 直接在页面，有语言选择
+     * - FORM_MKT   : mkt.djiits.com EAN 等页面，checkbox 直接在页面，React 组件
+     * - SALES_BAN  : mkt.djiits.com sales_bans 页面，radio 按钮选择销售状态
+     * - TERMINATOR : terminator.djiits.com 页面刷新，Element UI checkbox
      ***********************************************/
     function detectPageType() {
+        if (location.hostname.includes('terminator')) {
+            return 'TERMINATOR';
+        }
         if (document.querySelector('input[name="component_instance[countries][]"]')) {
             return 'FORM';
         }
@@ -391,6 +395,87 @@
         }
 
         console.log(`Chris [SALES_BAN]：已应用 ${cfg.name}，Timed Sale=${applied.length}个，跳过OnSale=${skipped.length}个`);
+    }
+
+    /***********************************************
+     * TERMINATOR 型逻辑（terminator.djiits.com 页面刷新）
+     * Element UI el-checkbox 组件，需通过点击 label 触发 Vue 数据绑定
+     ***********************************************/
+    function applyTerminator(cfg) {
+        // 获取所有 el-checkbox（国家和语言共用同一种组件）
+        const allCheckboxes = document.querySelectorAll('input.el-checkbox__original');
+
+        // 辅助：通过 value 找到 checkbox 并返回其外层 label
+        function findElCheckbox(value) {
+            for (const cb of allCheckboxes) {
+                if (cb.value && cb.value.toLowerCase() === value.toLowerCase()) {
+                    return cb;
+                }
+            }
+            return null;
+        }
+
+        // 辅助：点击 el-checkbox 的外层 label 触发 Vue 状态更新
+        function clickElCheckbox(cb, shouldCheck) {
+            const isChecked = cb.closest('.el-checkbox__input')?.classList.contains('is-checked');
+            if (shouldCheck && !isChecked) {
+                // 需要勾选但当前未勾选 → 点击
+                const label = cb.closest('label.el-checkbox');
+                if (label) label.click();
+            } else if (!shouldCheck && isChecked) {
+                // 需要取消但当前已勾选 → 点击
+                const label = cb.closest('label.el-checkbox');
+                if (label) label.click();
+            }
+        }
+
+        // 非累加模式：先取消所有国家 checkbox
+        // 国家 checkbox 的 value 是两位小写字母（排除语言、平台、全选等）
+        const countryValues = cfg.values.map(v => v.toLowerCase());
+        const langValues = Array.isArray(cfg.lang) ? cfg.lang : (cfg.lang ? [cfg.lang] : []);
+
+        if (!accumulateMode) {
+            // 取消所有国家 checkbox（value 为两位小写字母，且不是语言代码）
+            const knownLangs = ['zh-cn', 'en', 'zh-tw', 'ja', 'ko', 'de', 'fr', 'it', 'es'];
+            const nonCountryValues = ['全部页面', 'reactor页面', 'pc', 'mobile', 'app', '全选'];
+            for (const cb of allCheckboxes) {
+                const val = cb.value?.toLowerCase() || '';
+                // 跳过非国家项
+                if (knownLangs.includes(val) || nonCountryValues.includes(val) || val.length === 0) continue;
+                // 跳过「选择语言后自动勾选」等功能性 checkbox（value 为空）
+                if (!val.match(/^[a-z]{2}$/)) continue;
+                // 这是国家 checkbox → 取消勾选
+                clickElCheckbox(cb, false);
+            }
+
+            // 取消所有语言 checkbox
+            for (const langCode of knownLangs) {
+                const cb = findElCheckbox(langCode);
+                if (cb) clickElCheckbox(cb, false);
+            }
+        }
+
+        // 勾选目标国家
+        countryValues.forEach(code => {
+            const cb = findElCheckbox(code);
+            if (cb) {
+                clickElCheckbox(cb, true);
+            } else {
+                console.warn(`Chris [TERMINATOR]：找不到国家 checkbox value="${code}"`);
+            }
+        });
+
+        // 勾选目标语言
+        langValues.forEach(lang => {
+            const cb = findElCheckbox(lang);
+            if (cb) {
+                clickElCheckbox(cb, true);
+            } else {
+                console.warn(`Chris [TERMINATOR]：找不到语言 checkbox value="${lang}"`);
+            }
+        });
+
+        console.log(`Chris [TERMINATOR${accumulateMode ? '/累加' : ''}]：已应用 ${cfg.name}，国家=${countryValues.join(',')}，语言=${langValues.join(',')}`);
     }
 
     /***********************************************
@@ -780,6 +865,7 @@
                 if (pageType === 'FORM') applyForm(cfg);
                 else if (pageType === 'FORM_MKT') applyFormMkt(cfg);
                 else if (pageType === 'SALES_BAN') applySalesBan(cfg);
+                else if (pageType === 'TERMINATOR') applyTerminator(cfg);
                 else applyModal(cfg);
                 btn.style.transform = 'scale(0.92)';
                 btn.style.filter = 'brightness(0.9)';
@@ -1107,7 +1193,7 @@
 
         injectPanel(pageType);
 
-        if (pageType === 'FORM' || pageType === 'FORM_MKT' || pageType === 'SALES_BAN') {
+        if (pageType === 'FORM' || pageType === 'FORM_MKT' || pageType === 'SALES_BAN' || pageType === 'TERMINATOR') {
             // 表单型：直接常驻显示
             showPanel();
 
