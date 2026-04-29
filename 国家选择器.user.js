@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.17.0
+// @version       2.17.1
 // @description   电源规格国家选择器 + Stormsend语种Tab固定 + APP组件编辑提醒（6种页面支持，含Terminator）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -686,8 +686,9 @@
     }
 
     function setupAppReminder() {
-        // stormsend 全站生效
+        // stormsend 全站生效，但只在主 frame 显示（iframe 内不重复）
         if (!location.hostname.includes('stormsend')) return;
+        if (window !== window.top) return;
 
         injectAppReminderStyles();
 
