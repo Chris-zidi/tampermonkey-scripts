@@ -685,17 +685,24 @@
 
     function setupAppReminder() {
         // 仅 component_instances 编辑页需要
-        if (!/\/component_instances\/\d+\/edit/.test(location.pathname)) return;
+        const isEditPage = /\/component_instances\/\d+\/edit/.test(location.pathname);
+        console.log('[APP提醒] URL检测:', location.pathname, '匹配:', isEditPage);
+        if (!isEditPage) return;
 
         injectAppReminderStyles();
 
-        // 延迟检测（等待 SPA 内容渲染）
-        setTimeout(() => {
-            if (isAppComponentEditPage()) {
+        // 延迟检测（等待 SPA 内容渲染）— 多次尝试，防止 DOM 还没渲染完
+        function tryShowBanner(attempt) {
+            const isApp = isAppComponentEditPage();
+            console.log(`[APP提醒] 第${attempt}次检测 - 是否APP页面:`, isApp);
+            if (isApp) {
                 showAppBanner();
                 console.log('[APP提醒] 已显示顶部横幅');
+            } else if (attempt < 3) {
+                setTimeout(() => tryShowBanner(attempt + 1), 2000);
             }
-        }, 1500);
+        }
+        setTimeout(() => tryShowBanner(1), 1500);
 
         // 拦截复制按钮 —— 捕获阶段，优先于页面自身的 jQuery handler
         document.addEventListener('click', function (e) {
