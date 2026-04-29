@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.14.0
-// @description   电源规格国家选择器 + Stormsend语种Tab固定（6种页面支持，含Terminator）
+// @version       2.15.0
+// @description   电源规格国家选择器 + Stormsend语种Tab固定 + APP组件编辑提醒（6种页面支持，含Terminator）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
 // @grant         none
@@ -11,7 +11,7 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.13.0 启动');
+    console.log('Chris：国家Selector v2.15.0 启动');
 
     /**************** 累加模式（默认关闭）****************/
     let accumulateMode = false;
@@ -535,6 +535,204 @@
         });
 
         console.log(`Chris [SALES_BAN]：已应用时间 "${timeValue}" 到 ${applied}/${targetCountries.length} 个国家`);
+    }
+
+    /***********************************************
+     * APP 组件编辑提醒（独立模块）
+     * 功能：进入 APP 容器编辑页时显示顶部横幅提醒，
+     *       点击复制按钮时弹出确认弹窗。
+     ***********************************************/
+    function isAppComponentEditPage() {
+        // 必须是 component_instances 的编辑页
+        if (!/\/component_instances\/\d+\/edit/.test(location.pathname)) return false;
+
+        // 检查页面中是否有 APP 相关内容
+        const treeItems = document.querySelectorAll('.tree-item .J-name');
+        for (const el of treeItems) {
+            if (/APP/i.test(el.textContent)) return true;
+        }
+        // 检查页面标题区域
+        const headers = document.querySelectorAll('h1, h2, h3, .page-header, .container-name');
+        for (const el of headers) {
+            if (/APP/i.test(el.textContent)) return true;
+        }
+        // 检查 URL hash
+        if (/APP/i.test(location.hash)) return true;
+        return false;
+    }
+
+    function injectAppReminderStyles() {
+        if (document.getElementById('chris-app-reminder-style')) return;
+        const style = document.createElement('style');
+        style.id = 'chris-app-reminder-style';
+        style.textContent = `
+            #chris-app-banner {
+                position: fixed; top: 0; left: 0; right: 0; z-index: 99999;
+                background: linear-gradient(135deg, #ff6b35, #e63946);
+                color: #fff; padding: 10px 20px; font-size: 14px; font-weight: bold;
+                text-align: center; box-shadow: 0 2px 12px rgba(230,57,70,0.4);
+                display: flex; align-items: center; justify-content: center; gap: 12px;
+                animation: chrisBannerIn 0.4s ease-out;
+            }
+            @keyframes chrisBannerIn {
+                from { transform: translateY(-100%); opacity: 0; }
+                to   { transform: translateY(0);     opacity: 1; }
+            }
+            #chris-app-banner .banner-close {
+                cursor: pointer; font-size: 18px; opacity: 0.8; transition: opacity 0.2s;
+                background: none; border: none; color: #fff; padding: 0 8px;
+            }
+            #chris-app-banner .banner-close:hover { opacity: 1; }
+            #chris-app-overlay {
+                position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0,0,0,0.5); z-index: 999998;
+                animation: chrisOverlayIn 0.2s ease-out;
+            }
+            @keyframes chrisOverlayIn { from { opacity: 0; } to { opacity: 1; } }
+            #chris-app-dialog {
+                position: fixed; top: 50%; left: 50%;
+                transform: translate(-50%,-50%); z-index: 999999;
+                background: #fff; border-radius: 12px;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                width: 480px; max-width: 90vw; overflow: hidden;
+                animation: chrisDialogIn 0.3s ease-out;
+            }
+            @keyframes chrisDialogIn {
+                from { transform: translate(-50%,-50%) scale(0.85); opacity: 0; }
+                to   { transform: translate(-50%,-50%) scale(1);    opacity: 1; }
+            }
+            #chris-app-dialog .dlg-header {
+                background: linear-gradient(135deg, #ff6b35, #e63946);
+                color: #fff; padding: 16px 20px; font-size: 16px; font-weight: bold;
+                display: flex; align-items: center; gap: 8px;
+            }
+            #chris-app-dialog .dlg-body {
+                padding: 20px; color: #333; font-size: 14px; line-height: 1.8;
+            }
+            #chris-app-dialog .dlg-warn {
+                display: flex; align-items: flex-start; gap: 8px; margin: 8px 0;
+                padding: 8px 12px; background: #fff3cd;
+                border-left: 3px solid #ffc107; border-radius: 4px;
+            }
+            #chris-app-dialog .dlg-footer {
+                padding: 12px 20px 16px; display: flex; justify-content: flex-end; gap: 10px;
+            }
+            #chris-app-dialog .btn-no {
+                padding: 8px 24px; border: 1px solid #ddd; border-radius: 6px;
+                background: #f5f5f5; color: #666; cursor: pointer; font-size: 14px;
+            }
+            #chris-app-dialog .btn-no:hover { background: #e8e8e8; }
+            #chris-app-dialog .btn-yes {
+                padding: 8px 24px; border: none; border-radius: 6px;
+                background: #e63946; color: #fff; cursor: pointer;
+                font-size: 14px; font-weight: bold;
+            }
+            #chris-app-dialog .btn-yes:hover { background: #c1121f; }
+        `;
+        document.head.appendChild(style);
+    }
+
+    function showAppBanner() {
+        if (document.getElementById('chris-app-banner')) return;
+        const banner = document.createElement('div');
+        banner.id = 'chris-app-banner';
+        banner.innerHTML =
+            '<span style="font-size:20px">⚠️</span>' +
+            '<span style="flex:1;text-align:center">' +
+            '【APP 组件提醒】后台修改 APP 组件后会<strong>立即生效</strong>！' +
+            '操作前请先<strong>修改生效时间</strong>或<strong>下线组件</strong>！</span>' +
+            '<button class="banner-close" title="关闭">✕</button>';
+        document.body.prepend(banner);
+        banner.querySelector('.banner-close').addEventListener('click', () => {
+            banner.style.animation = 'none';
+            banner.style.transition = 'transform 0.3s, opacity 0.3s';
+            banner.style.transform = 'translateY(-100%)';
+            banner.style.opacity = '0';
+            setTimeout(() => banner.remove(), 300);
+        });
+    }
+
+    function showCopyConfirmDialog(componentName, onConfirm) {
+        let o = document.getElementById('chris-app-overlay');
+        let d = document.getElementById('chris-app-dialog');
+        if (o) o.remove(); if (d) d.remove();
+
+        o = document.createElement('div'); o.id = 'chris-app-overlay';
+        d = document.createElement('div'); d.id = 'chris-app-dialog';
+        d.innerHTML =
+            '<div class="dlg-header">⚠️ APP 组件复制操作确认</div>' +
+            '<div class="dlg-body">' +
+            '<p>你正在复制组件：<strong>' + (componentName || '未知组件') + '</strong></p>' +
+            '<p style="margin-top:12px">APP 页面的组件修改后<strong style="color:#e63946">立即生效</strong>，请在操作前确认：</p>' +
+            '<div class="dlg-warn"><span>1️⃣</span><span>是否已经<strong>修改了生效时间</strong>（避免用户立即看到变更）？</span></div>' +
+            '<div class="dlg-warn"><span>2️⃣</span><span>或者是否已经<strong>下线了该组件</strong>？</span></div>' +
+            '<p style="margin-top:12px;color:#888;font-size:12px">如果还没有做以上操作，请先取消，处理好后再进行复制。</p>' +
+            '</div>' +
+            '<div class="dlg-footer"><button class="btn-no">取消复制</button><button class="btn-yes">已确认，继续复制</button></div>';
+        document.body.appendChild(o);
+        document.body.appendChild(d);
+
+        function close() { o.remove(); d.remove(); document.removeEventListener('keydown', esc); }
+        function esc(e) { if (e.key === 'Escape') close(); }
+        document.addEventListener('keydown', esc);
+        o.addEventListener('click', close);
+        d.querySelector('.btn-no').addEventListener('click', close);
+        d.querySelector('.btn-yes').addEventListener('click', () => {
+            close();
+            if (typeof onConfirm === 'function') onConfirm();
+        });
+    }
+
+    function setupAppReminder() {
+        // 仅 component_instances 编辑页需要
+        if (!/\/component_instances\/\d+\/edit/.test(location.pathname)) return;
+
+        injectAppReminderStyles();
+
+        // 延迟检测（等待 SPA 内容渲染）
+        setTimeout(() => {
+            if (isAppComponentEditPage()) {
+                showAppBanner();
+                console.log('[APP提醒] 已显示顶部横幅');
+            }
+        }, 1500);
+
+        // 拦截复制按钮 —— 捕获阶段，优先于页面自身的 jQuery handler
+        document.addEventListener('click', function (e) {
+            const copyBtn = e.target.closest('a.J-copy');
+            if (!copyBtn) return;
+            // 已确认则放行
+            if (copyBtn.dataset.appReminderOk === '1') {
+                delete copyBtn.dataset.appReminderOk;
+                return;
+            }
+            e.preventDefault();
+            e.stopImmediatePropagation();
+
+            // 获取组件名
+            const treeItem = copyBtn.closest('.tree-item.J-tree-item');
+            const name = treeItem
+                ? (treeItem.querySelector('.J-name')?.textContent?.trim() || treeItem.getAttribute('data-component-name') || '')
+                : '';
+
+            showCopyConfirmDialog(name, () => {
+                copyBtn.dataset.appReminderOk = '1';
+                copyBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+            });
+        }, true);
+
+        console.log('[APP提醒] 复制按钮拦截已就绪');
+
+        // SPA 路由变化时重新检测横幅
+        let lastHref = location.href;
+        new MutationObserver(() => {
+            if (location.href !== lastHref) {
+                lastHref = location.href;
+                const old = document.getElementById('chris-app-banner');
+                if (old) old.remove();
+                setTimeout(() => { if (isAppComponentEditPage()) showAppBanner(); }, 1500);
+            }
+        }).observe(document.body, { childList: true, subtree: true });
     }
 
     /***********************************************
@@ -1223,6 +1421,10 @@
         if (window === window.top && hasLangGroupAnywhere()) {
             injectLangTab();
         }
+
+        // APP 组件编辑提醒（独立于国家选择器）
+        // 在 component_instances 编辑页显示横幅 + 拦截复制按钮
+        setupAppReminder();
     }
 
     if (document.body) {
