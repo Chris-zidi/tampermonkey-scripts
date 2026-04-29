@@ -640,7 +640,8 @@
             '<span style="font-size:20px">⚠️</span>' +
             '<span style="flex:1;text-align:center">' +
             '【APP 组件提醒】后台修改 APP 组件后会<strong>立即生效</strong>！' +
-            '操作前请先<strong>修改生效时间</strong>或<strong>下线组件</strong>！</span>' +
+            '操作前请先<strong>修改生效时间</strong>或<strong>下线组件</strong>！' +
+            '<br>新品上线 Banner 包括 PC 和 APP 端！记得设置上线时只设置 <strong>7 天</strong>，到期自动下线！</span>' +
             '<button class="banner-close" title="关闭">✕</button>';
         document.body.prepend(banner);
         banner.querySelector('.banner-close').addEventListener('click', () => {
