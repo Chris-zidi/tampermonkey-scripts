@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.16.2
+// @version       2.17.0
 // @description   电源规格国家选择器 + Stormsend语种Tab固定 + APP组件编辑提醒（6种页面支持，含Terminator）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -686,60 +686,51 @@
     }
 
     function setupAppReminder() {
-        // 仅 component_instances 编辑页需要
-        const isEditPage = /\/component_instances\/\d+\/edit/.test(location.pathname);
-        console.log('[APP提醒] URL检测:', location.pathname, '匹配:', isEditPage);
-        if (!isEditPage) return;
+        // stormsend 全站生效
+        if (!location.hostname.includes('stormsend')) return;
 
         injectAppReminderStyles();
 
-        // 延迟检测（等待 SPA 内容渲染）— 多次尝试，防止 DOM 还没渲染完
-        function tryShowBanner(attempt) {
-            const isApp = isAppComponentEditPage();
-            console.log(`[APP提醒] 第${attempt}次检测 - 是否APP页面:`, isApp);
-            if (isApp) {
-                showAppBanner();
-                console.log('[APP提醒] 已显示顶部横幅');
-            } else if (attempt < 3) {
-                setTimeout(() => tryShowBanner(attempt + 1), 2000);
-            }
+        // 全局横幅 —— 进入 stormsend 就显示，像公告栏一样
+        showAppBanner();
+        console.log('[APP提醒] 已显示全局横幅');
+
+        // 复制按钮拦截 —— 仅 component_instances 编辑页有复制按钮
+        if (/\/component_instances\/\d+\/edit/.test(location.pathname)) {
+            document.addEventListener('click', function (e) {
+                const copyBtn = e.target.closest('a.J-copy');
+                if (!copyBtn) return;
+                // 已确认则放行
+                if (copyBtn.dataset.appReminderOk === '1') {
+                    delete copyBtn.dataset.appReminderOk;
+                    return;
+                }
+                e.preventDefault();
+                e.stopImmediatePropagation();
+
+                // 获取组件名
+                const treeItem = copyBtn.closest('.tree-item.J-tree-item');
+                const name = treeItem
+                    ? (treeItem.querySelector('.J-name')?.textContent?.trim() || treeItem.getAttribute('data-component-name') || '')
+                    : '';
+
+                showCopyConfirmDialog(name, () => {
+                    copyBtn.dataset.appReminderOk = '1';
+                    copyBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+                });
+            }, true);
+
+            console.log('[APP提醒] 复制按钮拦截已就绪');
         }
-        setTimeout(() => tryShowBanner(1), 1500);
 
-        // 拦截复制按钮 —— 捕获阶段，优先于页面自身的 jQuery handler
-        document.addEventListener('click', function (e) {
-            const copyBtn = e.target.closest('a.J-copy');
-            if (!copyBtn) return;
-            // 已确认则放行
-            if (copyBtn.dataset.appReminderOk === '1') {
-                delete copyBtn.dataset.appReminderOk;
-                return;
-            }
-            e.preventDefault();
-            e.stopImmediatePropagation();
-
-            // 获取组件名
-            const treeItem = copyBtn.closest('.tree-item.J-tree-item');
-            const name = treeItem
-                ? (treeItem.querySelector('.J-name')?.textContent?.trim() || treeItem.getAttribute('data-component-name') || '')
-                : '';
-
-            showCopyConfirmDialog(name, () => {
-                copyBtn.dataset.appReminderOk = '1';
-                copyBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-            });
-        }, true);
-
-        console.log('[APP提醒] 复制按钮拦截已就绪');
-
-        // SPA 路由变化时重新检测横幅
+        // SPA 路由变化时确保横幅始终存在
         let lastHref = location.href;
         new MutationObserver(() => {
             if (location.href !== lastHref) {
                 lastHref = location.href;
-                const old = document.getElementById('chris-app-banner');
-                if (old) old.remove();
-                setTimeout(() => { if (isAppComponentEditPage()) showAppBanner(); }, 1500);
+                if (!document.getElementById('chris-app-banner')) {
+                    showAppBanner();
+                }
             }
         }).observe(document.body, { childList: true, subtree: true });
     }
