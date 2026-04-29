@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.15.0
+// @version       2.16.0
 // @description   电源规格国家选择器 + Stormsend语种Tab固定 + APP组件编辑提醒（6种页面支持，含Terminator）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -11,7 +11,7 @@
 // ==/UserScript==
 
 (function () {
-    console.log('Chris：国家Selector v2.15.0 启动');
+    console.log('Chris：国家Selector v2.16.0 启动');
 
     /**************** 累加模式（默认关闭）****************/
     let accumulateMode = false;
@@ -820,6 +820,32 @@
                 border-color: rgba(255,255,255,0.7);
                 box-shadow: 0 0 12px rgba(67,160,71,0.5);
             }
+            /* 电源规格开关 */
+            #chris-power-toggle {
+                width: ${BTN_WIDTH}px;
+                height: 30px;
+                border-radius: 6px;
+                border: 2px solid rgba(255,255,255,0.5);
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 700;
+                font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+                pointer-events: auto;
+                transition: all 0.2s ease;
+                margin-bottom: 6px;
+                text-align: center;
+                letter-spacing: 0.5px;
+            }
+            #chris-power-toggle.on {
+                background: linear-gradient(135deg, #1976d2, #42a5f5);
+                color: #fff;
+                border-color: rgba(255,255,255,0.7);
+                box-shadow: 0 0 12px rgba(25,118,210,0.5);
+            }
+            #chris-power-toggle.off {
+                background: rgba(120,120,120,0.7);
+                color: rgba(255,255,255,0.8);
+            }
             /* Sales Ban 时间输入框 */
             #chris-time-input {
                 width: ${BTN_WIDTH}px;
@@ -1022,6 +1048,31 @@
             console.log(`Chris：累加模式 ${accumulateMode ? '开启' : '关闭'}`);
         };
 
+        // 电源规格开关（持久化到 localStorage）
+        const POWER_KEY = 'chris-power-spec-visible';
+        let powerVisible = localStorage.getItem(POWER_KEY) !== 'false'; // 默认显示
+
+        const powerBtn = document.createElement('button');
+        powerBtn.id = 'chris-power-toggle';
+        powerBtn.className = powerVisible ? 'on' : 'off';
+        powerBtn.textContent = powerVisible ? '电源规格：开' : '电源规格：关';
+
+        function updatePowerBtns() {
+            const specBtns = btnList.querySelectorAll('.chris-btn');
+            specBtns.forEach(b => { b.style.display = powerVisible ? '' : 'none'; });
+        }
+
+        powerBtn.onclick = e => {
+            e.stopPropagation();
+            e.preventDefault();
+            powerVisible = !powerVisible;
+            localStorage.setItem(POWER_KEY, powerVisible ? 'true' : 'false');
+            powerBtn.className = powerVisible ? 'on' : 'off';
+            powerBtn.textContent = powerVisible ? '电源规格：开' : '电源规格：关';
+            updatePowerBtns();
+            console.log(`Chris：电源规格按钮 ${powerVisible ? '显示' : '隐藏'}`);
+        };
+
         // 过滤逻辑
         // showIn 数组：指定在哪些页面显示，不设置则所有页面都显示
         const visibleConfigs = BUTTON_CONFIGS.filter(cfg => {
@@ -1084,6 +1135,7 @@
 
         panel.appendChild(toggleBtn);
         btnList.insertBefore(accBtn, btnList.firstChild);
+        btnList.insertBefore(powerBtn, accBtn.nextSibling);
 
         // Sales Ban 页面专属：时间输入框 + 应用按钮
         if (pageType === 'SALES_BAN') {
@@ -1114,6 +1166,9 @@
 
         panel.appendChild(btnList);
         document.body.appendChild(panel);
+
+        // 初始化电源规格按钮显示/隐藏
+        updatePowerBtns();
     }
 
     function showPanel() {
