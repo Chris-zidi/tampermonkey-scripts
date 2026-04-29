@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.16.1
+// @version       2.16.2
 // @description   电源规格国家选择器 + Stormsend语种Tab固定 + APP组件编辑提醒（6种页面支持，含Terminator）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -667,6 +667,7 @@
             '<p style="margin-top:12px">APP 页面的组件修改后<strong style="color:#e63946">立即生效</strong>，请在操作前确认：</p>' +
             '<div class="dlg-warn"><span>1️⃣</span><span>是否已经<strong>修改了生效时间</strong>（避免用户立即看到变更）？</span></div>' +
             '<div class="dlg-warn"><span>2️⃣</span><span>或者是否已经<strong>下线了该组件</strong>？</span></div>' +
+            '<div class="dlg-warn"><span>3️⃣</span><span>新品上线 Banner 包括 PC 和 APP 端！记得设置上线时只设置 <strong>7 天</strong>，到期自动下线！</span></div>' +
             '<p style="margin-top:12px;color:#888;font-size:12px">如果还没有做以上操作，请先取消，处理好后再进行复制。</p>' +
             '</div>' +
             '<div class="dlg-footer"><button class="btn-no">取消复制</button><button class="btn-yes">已确认，继续复制</button></div>';
