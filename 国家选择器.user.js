@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.16.0
+// @version       2.16.1
 // @description   电源规格国家选择器 + Stormsend语种Tab固定 + APP组件编辑提醒（6种页面支持，含Terminator）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
