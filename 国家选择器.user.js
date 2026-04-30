@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.17.2
+// @version       2.17.3
 // @description   电源规格国家选择器 + Stormsend语种Tab固定 + APP组件编辑提醒（6种页面支持，含Terminator）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -642,7 +642,8 @@
             '【APP 组件提醒】后台修改 APP 组件后会<strong>立即生效</strong>！' +
             '操作前请先<strong>修改生效时间</strong>或<strong>下线组件</strong>！' +
             '<br>新品上线 Banner 包括 PC 和 APP 端！记得设置上线时只设置 <strong>7 天</strong>，到期自动下线！' +
-            '<br>复制 APP Banner 时注意：英文里的 <strong>SVG 会默认生效</strong>！复制完第一时间<strong>马上下线</strong>！</span>' +
+            '<br>复制 APP Banner 时注意：英文里的 <strong>SVG 会默认生效</strong>！复制完第一时间<strong>马上下线</strong>！' +
+            '<br>APP Banner 生效时间要设置<strong>提前 5 分钟</strong>！因为有延迟，过了生效时间约 5 分钟后 APP 才会显示内容！</span>' +
             '<button class="banner-close" title="关闭">✕</button>';
         document.body.prepend(banner);
         banner.querySelector('.banner-close').addEventListener('click', () => {
