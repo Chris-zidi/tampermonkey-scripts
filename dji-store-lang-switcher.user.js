@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DJI 语种快速切换2
 // @namespace    https://store.dji.com/
-// @version      4.10.0
+// @version      4.11.0
 // @description  在 DJI 商城及后台编辑页右侧注入语种快捷切换按钮面板，MKT 后台弹窗语种快选，产品页 SKU 快速切换，左侧模块导航面板
 // @author       o-park.chen
 // @match        https://store.dji.com/*
@@ -1775,5 +1775,110 @@
         mktPanelVisible = false;
       }
     }, 300);
+
+    // ── MKT 产品编辑页：固定右侧语种切换面板 ──────────────────
+    // URL 格式: /en/products/143480/overview/edit
+    // 匹配 /{lang}/products/{id}/... 的页面
+    const mktProductMatch = location.pathname.match(/^\/([a-z]{2}(?:-[A-Z]{2})?)\/(products\/\d+\/.*)$/);
+    if (!mktProductMatch) return; // 不是产品编辑页则跳过
+
+    const currentLang = mktProductMatch[1]; // 当前语种代码
+    const productPath = mktProductMatch[2]; // products/143480/overview/edit
+
+    // 注入右侧面板样式
+    const editStyle = document.createElement('style');
+    editStyle.textContent = `
+      #mkt-edit-lang-panel {
+        position: fixed;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 999999;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        pointer-events: none;
+        font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+      #mkt-edit-lang-toggle {
+        width: 26px; height: 26px; border-radius: 50%; border: none;
+        background: rgba(255,255,255,0.92);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        cursor: pointer; display: flex; align-items: center; justify-content: center;
+        font-size: 12px; transition: transform 0.2s, background 0.2s;
+        pointer-events: auto; margin-bottom: 4px;
+      }
+      #mkt-edit-lang-toggle:hover { background: #fff; transform: scale(1.1); }
+      #mkt-edit-lang-list {
+        display: flex; flex-direction: column; gap: 3px;
+      }
+      #mkt-edit-lang-list.collapsed { display: none; }
+      .mkt-edit-btn {
+        position: relative; width: 100px; height: 30px; border-radius: 8px; border: none;
+        color: #555; font-size: 13px; font-weight: 700;
+        font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+        letter-spacing: 0.5px; cursor: pointer;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+        transition: transform 0.15s cubic-bezier(.34,1.56,.64,1), box-shadow 0.15s, filter 0.15s;
+        pointer-events: auto; white-space: nowrap; text-align: center;
+        background: linear-gradient(160deg, rgba(255,255,255,0.95), rgba(230,230,230,0.95));
+      }
+      .mkt-edit-btn:hover { transform: scale(1.06) translateX(-3px); filter: brightness(1.05); }
+      .mkt-edit-btn.active {
+        color: #fff; font-weight: 800;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.35);
+        transform: scale(1.05);
+      }
+    `;
+    document.head.appendChild(editStyle);
+
+    // 构建面板
+    const editPanel = document.createElement('div');
+    editPanel.id = 'mkt-edit-lang-panel';
+
+    const editToggle = document.createElement('button');
+    editToggle.id = 'mkt-edit-lang-toggle';
+    editToggle.textContent = '›';
+    editToggle.title = '展开/收起语种';
+    editToggle.style.transform = 'rotate(180deg)';
+
+    const editList = document.createElement('div');
+    editList.id = 'mkt-edit-lang-list';
+
+    let editExpanded = true;
+    editToggle.onclick = (e) => {
+      e.stopPropagation();
+      editExpanded = !editExpanded;
+      editList.classList.toggle('collapsed', !editExpanded);
+      editToggle.style.transform = editExpanded ? 'rotate(180deg)' : 'rotate(0deg)';
+    };
+
+    MKT_LANGS.forEach((lang) => {
+      const btn = document.createElement('button');
+      btn.className = 'mkt-edit-btn';
+      const isActive = lang.value === currentLang;
+      if (isActive) {
+        btn.classList.add('active');
+        btn.style.background = lang.gradient;
+        btn.style.boxShadow = '0 4px 14px rgba(0,0,0,0.3)';
+      }
+      btn.textContent = lang.label;
+      btn.title = lang.label;
+
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (lang.value === currentLang) return; // 已经是当前语种
+        // 切换语种：替换 URL 中的语言代码
+        const newUrl = '/' + lang.value + '/' + productPath;
+        location.href = newUrl;
+      });
+
+      editList.appendChild(btn);
+    });
+
+    editPanel.appendChild(editToggle);
+    editPanel.appendChild(editList);
+    document.body.appendChild(editPanel);
   }
 })();
