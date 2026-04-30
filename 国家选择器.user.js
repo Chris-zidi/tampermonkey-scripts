@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          国家Selector
 // @namespace     https://github.com/Chris-zidi/tampermonkey-scripts
-// @version       2.17.1
+// @version       2.17.2
 // @description   电源规格国家选择器 + Stormsend语种Tab固定 + APP组件编辑提醒（6种页面支持，含Terminator）
 // @author        Chris-zidi
 // @match         *://*.djiits.com/*
@@ -641,7 +641,8 @@
             '<span style="flex:1;text-align:center">' +
             '【APP 组件提醒】后台修改 APP 组件后会<strong>立即生效</strong>！' +
             '操作前请先<strong>修改生效时间</strong>或<strong>下线组件</strong>！' +
-            '<br>新品上线 Banner 包括 PC 和 APP 端！记得设置上线时只设置 <strong>7 天</strong>，到期自动下线！</span>' +
+            '<br>新品上线 Banner 包括 PC 和 APP 端！记得设置上线时只设置 <strong>7 天</strong>，到期自动下线！' +
+            '<br>复制 APP Banner 时注意：英文里的 <strong>SVG 会默认生效</strong>！复制完第一时间<strong>马上下线</strong>！</span>' +
             '<button class="banner-close" title="关闭">✕</button>';
         document.body.prepend(banner);
         banner.querySelector('.banner-close').addEventListener('click', () => {
@@ -668,6 +669,7 @@
             '<div class="dlg-warn"><span>1️⃣</span><span>是否已经<strong>修改了生效时间</strong>（避免用户立即看到变更）？</span></div>' +
             '<div class="dlg-warn"><span>2️⃣</span><span>或者是否已经<strong>下线了该组件</strong>？</span></div>' +
             '<div class="dlg-warn"><span>3️⃣</span><span>新品上线 Banner 包括 PC 和 APP 端！记得设置上线时只设置 <strong>7 天</strong>，到期自动下线！</span></div>' +
+            '<div class="dlg-warn"><span>4️⃣</span><span>复制 APP Banner 时注意：英文里的 <strong>SVG 会默认生效</strong>，不要乱复制！复制完第一时间<strong>马上下线</strong>！</span></div>' +
             '<p style="margin-top:12px;color:#888;font-size:12px">如果还没有做以上操作，请先取消，处理好后再进行复制。</p>' +
             '</div>' +
             '<div class="dlg-footer"><button class="btn-no">取消复制</button><button class="btn-yes">已确认，继续复制</button></div>';
