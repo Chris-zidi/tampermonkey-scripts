@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         组件排序助手 (Component Sort Helper)
 // @namespace    https://dji.com/tools
-// @version      3.3.0
+// @version      3.4.0
 // @description  在 Terminator 后台可视化拖动组件排序，直接操控 Vue 数据层实时更新页面
 // @author       DJI Tools
 // @match        https://terminator.djiits.com/projects/*/pages/update/*
@@ -536,6 +536,23 @@
         padding: 30px 14px; text-align: center; color: #999;
         font-size: 13px; line-height: 1.8;
       }
+      .csh-save-bar {
+        padding: 8px 14px; border-top: 1px solid #e5e7eb;
+        flex-shrink: 0; text-align: center;
+      }
+      #${PANEL_ID}.csh-collapsed .csh-save-bar { display: none !important; }
+      .csh-btn-save {
+        background: linear-gradient(135deg, #1a73e8, #1557b0);
+        color: #fff; font-weight: 600; width: 100%;
+        padding: 8px 14px; font-size: 13px;
+        border: none; border-radius: 6px; cursor: pointer;
+      }
+      .csh-btn-save:hover {
+        background: linear-gradient(135deg, #1557b0, #0d47a1);
+      }
+      .csh-btn-save.saved {
+        background: #16a34a;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -606,6 +623,9 @@
           <button class="csh-btn csh-btn-secondary" id="csh-btn-copy">复制</button>
         </div>
         <div class="csh-output-content" id="csh-output-content"></div>
+      </div>
+      <div class="csh-save-bar" id="csh-save-bar">
+        <button class="csh-btn csh-btn-save" id="csh-btn-save">💾 保存草稿</button>
       </div>
     `;
 
@@ -1103,6 +1123,31 @@
         btn.textContent = '已复制!';
         setTimeout(() => { btn.textContent = '复制'; }, 1500);
       });
+    });
+
+    // —— 保存草稿（触发 Terminator 页面的保存按钮）——
+    document.getElementById('csh-btn-save').addEventListener('click', () => {
+      // 找到页面上 .edit-footer 里的保存草稿按钮（第二个 button）
+      const footer = document.querySelector('.edit-footer');
+      if (footer) {
+        const buttons = footer.querySelectorAll('button.el-button');
+        // 保存草稿通常是最后一个按钮
+        const saveBtn = buttons[buttons.length - 1];
+        if (saveBtn) {
+          saveBtn.click();
+          const myBtn = document.getElementById('csh-btn-save');
+          myBtn.textContent = '✓ 已保存';
+          myBtn.classList.add('saved');
+          setTimeout(() => {
+            myBtn.textContent = '💾 保存草稿';
+            myBtn.classList.remove('saved');
+          }, 2000);
+          // 隐藏提醒条
+          document.getElementById('csh-alert').style.display = 'none';
+          return;
+        }
+      }
+      alert('未找到保存草稿按钮，请手动点击页面下方的「保存草稿」');
     });
 
     // —— Ctrl+Z ——
