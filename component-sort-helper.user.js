@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         组件排序助手 (Component Sort Helper)
 // @namespace    https://dji.com/tools
-// @version      3.2.0
+// @version      3.3.0
 // @description  在 Terminator 后台可视化拖动组件排序，直接操控 Vue 数据层实时更新页面
 // @author       DJI Tools
 // @match        https://terminator.djiits.com/projects/*/pages/update/*
@@ -490,6 +490,13 @@
         color: #aaa; font-style: italic;
       }
       .csh-item-tid { font-size: 11px; color: #888; flex-shrink: 0; font-family: monospace; }
+      .csh-copy-btn {
+        cursor: pointer; font-size: 13px; flex-shrink: 0; padding: 2px 4px;
+        border: none; background: none; color: #aaa; border-radius: 3px;
+        transition: color 0.15s, background 0.15s; user-select: none; line-height: 1;
+      }
+      .csh-copy-btn:hover { color: #1a73e8; background: #e8f0fe; }
+      .csh-copy-btn.copied { color: #16a34a; }
       .csh-change-count {
         padding: 8px 14px; font-size: 12px; color: #666;
         border-top: 1px solid #e5e7eb;
@@ -679,6 +686,7 @@
 
     body.innerHTML = html;
     bindDragEvents(body, state);
+    bindCopyButtons(body);
   }
 
   function renderItem(item, state) {
@@ -720,6 +728,7 @@
         <span class="csh-item-type ${typeClass}">${escapeHtml(item.typeLabel)}</span>
         <span class="${nameClass}" title="${escapeHtml(item.tagLabel + ' | ' + (item.productName || ''))}">${escapeHtml(displayName)}</span>
         <span class="csh-item-tid">${tid}</span>
+        <button class="csh-copy-btn" data-copy="${tid}" title="复制 ID: ${tid}">📋</button>
       </div>
     `;
   }
@@ -777,6 +786,28 @@
         renderComponentList(state);
         updateChangeCount(state);
         draggedSeq = null;
+      });
+    });
+  }
+
+  // ============================================================
+  // 13.5 复制按钮绑定
+  // ============================================================
+  function bindCopyButtons(container) {
+    container.querySelectorAll('.csh-copy-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const text = btn.dataset.copy;
+        if (!text || text === '?') return;
+        navigator.clipboard.writeText(text).then(() => {
+          btn.textContent = '✓';
+          btn.classList.add('copied');
+          setTimeout(() => {
+            btn.textContent = '📋';
+            btn.classList.remove('copied');
+          }, 1000);
+        });
       });
     });
   }
