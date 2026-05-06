@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         组件排序助手 (Component Sort Helper)
 // @namespace    https://dji.com/tools
-// @version      3.1.0
+// @version      3.2.0
 // @description  在 Terminator 后台可视化拖动组件排序，直接操控 Vue 数据层实时更新页面
 // @author       DJI Tools
 // @match        https://terminator.djiits.com/projects/*/pages/update/*
@@ -335,6 +335,9 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
+        resize: both;
+        min-width: 360px;
+        min-height: 200px;
       }
       #${PANEL_ID}.csh-collapsed {
         width: 240px;
@@ -452,7 +455,7 @@
       .csh-item {
         display: flex; align-items: center; padding: 4px 10px; gap: 6px;
         cursor: grab; border-bottom: 1px solid #f3f4f6;
-        transition: background 0.15s; user-select: none;
+        transition: background 0.15s;
       }
       .csh-item:hover { background: #f0f7ff; }
       .csh-item.dragging { opacity: 0.4; background: #e0e7ef; }
@@ -460,19 +463,19 @@
       .csh-item.drag-over-below { border-bottom: 3px solid #1a73e8; padding-bottom: 1px; }
       .csh-item.moved-up { background: #ecfdf5; }
       .csh-item.moved-down { background: #fef3c7; }
-      .csh-drag-handle { color: #bbb; cursor: grab; font-size: 12px; flex-shrink: 0; width: 14px; }
+      .csh-drag-handle { color: #bbb; cursor: grab; font-size: 12px; flex-shrink: 0; width: 14px; user-select: none; }
       .csh-item-thumb {
         width: 32px; height: 32px; border-radius: 4px; object-fit: cover;
         flex-shrink: 0; background: #f3f4f6;
       }
       .csh-item-seq {
         background: #e5e7eb; color: #555; border-radius: 4px;
-        padding: 1px 5px; font-size: 10px; font-weight: 600;
-        min-width: 20px; text-align: center; flex-shrink: 0;
+        padding: 2px 6px; font-size: 11px; font-weight: 600;
+        min-width: 22px; text-align: center; flex-shrink: 0; user-select: none;
       }
       .csh-item-seq.changed { background: #fbbf24; color: #78350f; }
       .csh-item-type {
-        font-size: 9px; padding: 1px 5px; border-radius: 3px;
+        font-size: 10px; padding: 2px 6px; border-radius: 3px;
         flex-shrink: 0; font-weight: 500;
       }
       .csh-type-vertical { background: #dbeafe; color: #1e40af; }
@@ -486,7 +489,7 @@
       .csh-item-name.csh-no-product {
         color: #aaa; font-style: italic;
       }
-      .csh-item-tid { font-size: 9px; color: #999; flex-shrink: 0; font-family: monospace; }
+      .csh-item-tid { font-size: 11px; color: #888; flex-shrink: 0; font-family: monospace; }
       .csh-change-count {
         padding: 8px 14px; font-size: 12px; color: #666;
         border-top: 1px solid #e5e7eb;
