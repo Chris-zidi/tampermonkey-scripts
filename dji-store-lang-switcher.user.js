@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DJI 语种快速切换2
 // @namespace    https://store.dji.com/
-// @version      4.11.0
+// @version      4.11.1
 // @description  在 DJI 商城及后台编辑页右侧注入语种快捷切换按钮面板，MKT 后台弹窗语种快选，产品页 SKU 快速切换，左侧模块导航面板
 // @author       o-park.chen
 // @match        https://store.dji.com/*
@@ -10,8 +10,8 @@
 // @match        https://mkt.djiits.com/*
 // @grant        none
 // @run-at       document-end
-// @updateURL    https://raw.githubusercontent.com/Chris-zidi/tampermonkey-scripts/main/dji-store-lang-switcher.user.js
-// @downloadURL  https://raw.githubusercontent.com/Chris-zidi/tampermonkey-scripts/main/dji-store-lang-switcher.user.js
+// @updateURL    https://cdn.jsdelivr.net/gh/Chris-zidi/tampermonkey-scripts@main/dji-store-lang-switcher.user.js
+// @downloadURL  https://cdn.jsdelivr.net/gh/Chris-zidi/tampermonkey-scripts@main/dji-store-lang-switcher.user.js
 // ==/UserScript==
 
 (function () {
