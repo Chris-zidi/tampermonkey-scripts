@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         组件排序助手 (Component Sort Helper)
 // @namespace    https://dji.com/tools
-// @version      3.0.0
+// @version      3.1.0
 // @description  在 Terminator 后台可视化拖动组件排序，直接操控 Vue 数据层实时更新页面
 // @author       DJI Tools
 // @match        https://terminator.djiits.com/projects/*/pages/update/*
@@ -37,21 +37,36 @@
   }
 
   // ============================================================
-  // 2. 数据采集 — 从 Vue dragable-container 直接读取（PC 端）
+  // 2. 数据采集 — 从 Vue dragable-container 直接读取（自动检测 PC/Mobile）
   // ============================================================
   function getVueList() {
-    const container = document.querySelector('.dragable-container');
-    if (!container) return null;
-    const vue = container.__vue__;
-    if (!vue) return null;
-    return vue.$props.list || vue.list || null;
+    const containers = document.querySelectorAll('.dragable-container');
+    if (containers.length === 0) return null;
+
+    // 找到当前可见的容器（height > 0）
+    for (const container of containers) {
+      const rect = container.getBoundingClientRect();
+      if (rect.height > 0) {
+        const vue = container.__vue__;
+        if (!vue) continue;
+        const list = vue.$props.list || vue.list;
+        if (!list) continue;
+
+        // 判断 PC/Mobile：PC 的第一个组件通常不是 hg703SetStyle
+        // Mobile 的第一个组件通常是 hg703SetStyle
+        const mode = (list.length > 0 && list[0].slug === 'hg703SetStyle') ? 'Mobile' : 'PC';
+
+        return { list, mode };
+      }
+    }
+    return null;
   }
 
   function collectTerminatorComponents() {
-    const list = getVueList();
-    if (!list || list.length === 0) return [];
+    const result = getVueList();
+    if (!result || !result.list || result.list.length === 0) return { comps: [], mode: 'PC' };
 
-    return list.map((item, i) => ({
+    const comps = result.list.map((item, i) => ({
       seq: i,
       vueId: item.id,
       rankRow: item.rank_row,
@@ -62,6 +77,8 @@
       terminatorId: String(item.id),
       tagLabel: `${i} ${item.slug} - ${item.id}`,
     }));
+
+    return { comps, mode: result.mode };
   }
 
   // ============================================================
@@ -184,18 +201,17 @@
   // 6. 直接操控 Vue 数据层 — 核心功能
   // ============================================================
   function applyToVue(state) {
-    const list = getVueList();
-    if (!list) {
+    const vueResult = getVueList();
+    if (!vueResult) {
       alert('无法找到 Vue 组件列表，请确认在「页面结构配置」tab');
       return false;
     }
+    const list = vueResult.list;
 
     // 根据 currentOrder 构建新的数组顺序
-    // currentOrder 存的是 seq（原始序号），需要找到对应的 vueId
     const newItems = state.currentOrder.map((seq) => {
       const mapped = state.mappedItems.find((m) => m.seq === seq);
       if (!mapped || !mapped.vueId) return null;
-      // 在当前 Vue list 中找到对应的数据对象
       return list.find((item) => item.id === mapped.vueId);
     }).filter(Boolean);
 
@@ -321,8 +337,9 @@
         overflow: hidden;
       }
       #${PANEL_ID}.csh-collapsed {
-        width: 220px;
-        max-height: 44px;
+        width: 240px;
+        max-height: 50px;
+        overflow: visible;
       }
       #${PANEL_ID}.csh-collapsed .csh-body,
       #${PANEL_ID}.csh-collapsed .csh-toolbar,
@@ -830,6 +847,7 @@
       undoStack: [],
       viewMode: 'all',
       hasEditorData: false,
+      mode: 'PC', // 'PC' or 'Mobile'
     };
 
     // —— 折叠 ——
@@ -841,12 +859,20 @@
 
     // —— 刷新组件（从 Vue 数据层读取）——
     document.getElementById('csh-btn-refresh').addEventListener('click', () => {
-      state.terminatorComps = collectTerminatorComponents();
+      const result = collectTerminatorComponents();
+      state.terminatorComps = result.comps;
+      state.mode = result.mode;
+
       if (state.terminatorComps.length === 0) {
         setStatus('未找到 Vue 组件列表，请确认在「页面结构配置」tab 且已加载完成', 'error');
         return;
       }
-      setStatus(`已从 Vue 读取 ${state.terminatorComps.length} 个组件 (PC端)`, 'success');
+
+      // 更新标题显示当前模式
+      const titleEl = panel.querySelector('.csh-header-title');
+      titleEl.textContent = `组件排序助手 v3 [${state.mode}]`;
+
+      setStatus(`已从 Vue 读取 ${state.terminatorComps.length} 个组件 (${state.mode}端)`, 'success');
 
       if (state.editorComps.length > 0) {
         rebuildMapping(state);
@@ -883,7 +909,9 @@
         GM_setValue(STORAGE_PREFIX + 'editor_' + getPageId(), url);
 
         if (state.terminatorComps.length === 0) {
-          state.terminatorComps = collectTerminatorComponents();
+          const result = collectTerminatorComponents();
+          state.terminatorComps = result.comps;
+          state.mode = result.mode;
         }
         state.hasEditorData = true;
         rebuildMapping(state);
@@ -921,7 +949,8 @@
         state.undoStack = [];
 
         // 重新从 Vue 读取数据以确认同步
-        state.terminatorComps = collectTerminatorComponents();
+        const refreshResult = collectTerminatorComponents();
+        state.terminatorComps = refreshResult.comps;
         if (state.hasEditorData) {
           rebuildMapping(state);
         } else {
@@ -972,13 +1001,57 @@
       }
     });
 
-    // —— 重置 ——
+    // —— 重置（完整重新初始化）——
     document.getElementById('csh-btn-reset').addEventListener('click', () => {
-      state.undoStack.push([...state.currentOrder]);
-      state.currentOrder = [...state.originalOrder];
-      renderComponentList(state);
-      updateChangeCount(state);
+      // 清空所有状态
+      state.terminatorComps = [];
+      state.editorComps = [];
+      state.mappedItems = [];
+      state.originalOrder = [];
+      state.currentOrder = [];
+      state.undoStack = [];
+      state.hasEditorData = false;
+      state.mode = 'PC';
+
+      // 隐藏输出和提醒
       document.getElementById('csh-output').style.display = 'none';
+      document.getElementById('csh-alert').style.display = 'none';
+      document.getElementById('csh-change-bar').style.display = 'none';
+      document.getElementById('csh-search').value = '';
+
+      // 重置标题
+      panel.querySelector('.csh-header-title').textContent = '组件排序助手 v3';
+
+      // 重新从 Vue 读取数据
+      const result = collectTerminatorComponents();
+      state.terminatorComps = result.comps;
+      state.mode = result.mode;
+
+      if (state.terminatorComps.length > 0) {
+        panel.querySelector('.csh-header-title').textContent = `组件排序助手 v3 [${state.mode}]`;
+        setStatus(`已重置，重新读取 ${state.terminatorComps.length} 个组件 (${state.mode}端)`, 'success');
+
+        // 如果有保存的编辑后台 URL，自动重新关联
+        const savedUrl = GM_getValue(STORAGE_PREFIX + 'editor_' + getPageId(), '');
+        if (savedUrl) {
+          document.getElementById('csh-btn-link').click();
+        } else {
+          state.mappedItems = state.terminatorComps.map((t, i) => ({
+            seq: i, terminator: t, editor: null,
+            productName: '', typeName: t.typeName,
+            typeLabel: TYPE_LABEL[t.typeName] || t.typeName,
+            terminatorId: t.terminatorId, vueId: t.vueId,
+            coverUrl: t.coverUrl, tagLabel: t.tagLabel,
+          }));
+          state.originalOrder = state.mappedItems.map((m) => m.seq);
+          state.currentOrder = [...state.originalOrder];
+          renderComponentList(state);
+          updateChangeCount(state);
+        }
+      } else {
+        setStatus('未找到组件，请确认在「页面结构配置」tab', 'error');
+        document.getElementById('csh-body').innerHTML = '<div class="csh-empty">点击「刷新组件」重新读取</div>';
+      }
     });
 
     // —— 生成指令 ——
@@ -1014,9 +1087,12 @@
     const savedUrl = GM_getValue(STORAGE_PREFIX + 'editor_' + getPageId(), '');
     if (savedUrl) {
       setTimeout(() => {
-        state.terminatorComps = collectTerminatorComponents();
+        const result = collectTerminatorComponents();
+        state.terminatorComps = result.comps;
+        state.mode = result.mode;
         if (state.terminatorComps.length > 0) {
-          setStatus(`已读取 ${state.terminatorComps.length} 个组件，正在关联编辑后台...`, '');
+          panel.querySelector('.csh-header-title').textContent = `组件排序助手 v3 [${state.mode}]`;
+          setStatus(`已读取 ${state.terminatorComps.length} 个组件 (${state.mode}端)，正在关联编辑后台...`, '');
           document.getElementById('csh-btn-link').click();
         }
       }, 2000);
